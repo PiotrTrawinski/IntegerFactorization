@@ -6,6 +6,7 @@
 #include "common.h"
 #include "64bitIntrinsics.h"
 #include <cstdint>
+#include <cstring>
 #include <gmp.h>
 
 namespace bigIntKernels {

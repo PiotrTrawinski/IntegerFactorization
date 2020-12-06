@@ -8,7 +8,6 @@
 #include <cstdint>
 #include <limits>
 #include <algorithm>
-#include <intrin.h>
 #include <cmath>
 #include <array>
 

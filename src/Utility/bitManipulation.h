@@ -4,34 +4,34 @@
 #include <cstdint>
 
 #if defined(COMPILER_MSVC)
-    #define NOMINMAX
-    #include <Windows.h>
+#define NOMINMAX
+#include <Windows.h>
 #endif
 
 constexpr uint64_t MaxU64 = ~0ull;
 
 uint64_t sizeInBits(uint64_t a) {
-    #if defined(COMPILER_GCC) || defined(COMPILER_CLANG)
-        return 64ull - __builtin_clzll(a);
-    #elif defined(COMPILER_MSVC)
-        DWORD index;
-        _BitScanReverse64(&index, a);
-        return index + 1ull;
-    #else
-        static_assert(false, "unsupported compiler. Cannot compute sizeInBits");
-    #endif
+#if defined(COMPILER_GCC) || defined(COMPILER_CLANG)
+    return 64ull - __builtin_clzll(a);
+#elif defined(COMPILER_MSVC)
+    DWORD index;
+    _BitScanReverse64(&index, a);
+    return index + 1ull;
+#else
+    static_assert(false, "unsupported compiler. Cannot compute sizeInBits");
+#endif
 }
 
 uint64_t mostSignificantBit(uint64_t a) {
-    #if defined(COMPILER_GCC) || defined(COMPILER_CLANG)
-        return 1ull << (63 - __builtin_clzll(a));
-    #elif defined(COMPILER_MSVC)
-        DWORD index;
-        _BitScanReverse64(&index, a);
-        return 1ull << index;
-    #else
-        static_assert(false, "unsupported compiler. Cannot compute mostSignificantBit");
-    #endif
+#if defined(COMPILER_GCC) || defined(COMPILER_CLANG)
+    return 1ull << (63 - __builtin_clzll(a));
+#elif defined(COMPILER_MSVC)
+    DWORD index;
+    _BitScanReverse64(&index, a);
+    return 1ull << index;
+#else
+    static_assert(false, "unsupported compiler. Cannot compute mostSignificantBit");
+#endif
 }
 
 uint64_t leadingZeroBitsCount(uint64_t a) {
@@ -43,5 +43,9 @@ uint64_t leadingSetBitCount(uint64_t a) {
 }
 
 uint64_t bitSetCount(uint64_t a) {
+#if defined(_WIN32)
     return __popcnt64(a);
+#else
+    return __builtin_popcountll(a);
+#endif
 }
