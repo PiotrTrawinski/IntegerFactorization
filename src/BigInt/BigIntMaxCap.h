@@ -77,7 +77,7 @@ private:
 
 template<int MaxCap> struct BigIntParseImpl<BigIntMaxCap<MaxCap>> {
     static BigIntMaxCap<MaxCap> parse(const std::string& str) {
-		return BigIntMaxCap<MaxCap> { str };
+        return BigIntMaxCap<MaxCap> { str };
     }
 };
 

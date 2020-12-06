@@ -152,8 +152,8 @@ template<typename ModType> BigIntValueType<ModType> pollardRho(PollardRhoParams&
 }
 
 BigInt pollardRhoBrent(PollardRhoParams& params, const BigInt& n) {
-	return n.visit([&params](auto&& a) { return BigInt{ pollardRhoBrent(params, a) }; });
+    return n.visit([&params](auto&& a) { return BigInt{ pollardRhoBrent(params, a) }; });
 }
 BigInt pollardRho(PollardRhoParams& params, const BigInt& n) {
-	return n.visit([&params](auto&& a) { return BigInt{ pollardRho(params, a) }; });
+    return n.visit([&params](auto&& a) { return BigInt{ pollardRho(params, a) }; });
 }

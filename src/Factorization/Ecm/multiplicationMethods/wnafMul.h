@@ -70,7 +70,7 @@ std::pair<int, int> nafDblAddCounts(const StackVector<int8_t, 64>& naf) {
 }
 int nafCost(const StackVector<int8_t, 64>& naf, int dblCost, int addCost, int intermediateDblCost, int intermediateAddCost) {
     auto [dblCount, addCount] = nafDblAddCounts(naf);
-	return (intermediateDblCost * (dblCount - addCount) + dblCost * addCount) + (intermediateAddCost * (addCount - 1) + addCost);
+    return (intermediateDblCost * (dblCount - addCount) + dblCost * addCount) + (intermediateAddCost * (addCount - 1) + addCost);
 }
 
 template<template<typename, typename> typename CurveType, typename Type, typename ModType> void nafMul(EcmContext& context, CurveType<Type, ModType>& curve, CurvePoint<Type>& p, uint64_t n) {

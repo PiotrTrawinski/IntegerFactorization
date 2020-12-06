@@ -182,7 +182,7 @@ void optimalChainGroup(uint64_t B1) {
         }
         auto [bestWNaf, bestNafForm] = getBestWNaf(number, [&](auto& naf) {
             return nafCost(naf, 8, 8, 8, 8);
-		});
+        });
         costs[number] = nafCost(bestNafForm, 8, 8, 8, 8);
     } while (nextMultisetSubset(primeMultiplicities, counts, (int)counts.size()));
     auto bestPartition = optimalPrimePartition(primeMultiplicities, primesUnique, costs);

@@ -44,19 +44,19 @@ void dixonLenstra(uint64_t B1, int tupleSize) {
     }
 
     writeln("results:");
-	for (auto& res : result) {
-		std::cout << std::setw(20) << res.number << " ";
-		std::cout << std::setw(50) << toString(res.factors) << " ";
-		std::cout << nafToString(res.nafForm) << '\n';
-	}
-	
-	int dblCount = 0;
-	int addCount = 0;
-	for (auto& res : result) {
-		dblCount += res.dblCount;
-		addCount += res.addCount;
-	}
-	writeln("dblCount = ", dblCount);
-	writeln("addCount = ", addCount);
+    for (auto& res : result) {
+        std::cout << std::setw(20) << res.number << " ";
+        std::cout << std::setw(50) << toString(res.factors) << " ";
+        std::cout << nafToString(res.nafForm) << '\n';
+    }
+    
+    int dblCount = 0;
+    int addCount = 0;
+    for (auto& res : result) {
+        dblCount += res.dblCount;
+        addCount += res.addCount;
+    }
+    writeln("dblCount = ", dblCount);
+    writeln("addCount = ", addCount);
     writeln("totalCost = ", dblCount + addCount);
 }

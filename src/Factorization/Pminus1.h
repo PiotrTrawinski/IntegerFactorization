@@ -8,7 +8,7 @@
 template<typename Type, typename ModType> void SquareAndMultiply(Type& a, const ModType& m, uint64_t n) {
     auto b = a;
     for (auto i = mostSignificantBit(n) >> 1; i > 0; i >>= 1) {
-		modSqr(a, a, m);
+        modSqr(a, a, m);
         if (n & i) {
             modMul(a, a, b, m);
         }
@@ -16,35 +16,35 @@ template<typename Type, typename ModType> void SquareAndMultiply(Type& a, const 
 }
 
 template<typename ModType> BigIntValueType<ModType> pMinus1(const ModType& n, uint64_t B1, uint64_t B2) {
-	using T = BigIntValueType<ModType>;
-	auto one = T{ 1 };
-	//auto modValue = getModValue(n);
+    using T = BigIntValueType<ModType>;
+    auto one = T{ 1 };
+    //auto modValue = getModValue(n);
     auto oneConst = getConstant(1, n);
 
-	// Stage 1
-	T x = getConstant(2, n);
+    // Stage 1
+    T x = getConstant(2, n);
     int i = 0;
     for (; Primes_1_000_000[i] <= B1; ++i) {
-		uint64_t p = Primes_1_000_000[i];
-		uint64_t q;
-		do {
-			q = p;
-			p *= Primes_1_000_000[i];
-		} while (p <= B1);
-		SquareAndMultiply(x, n, q);
-	}
+        uint64_t p = Primes_1_000_000[i];
+        uint64_t q;
+        do {
+            q = p;
+            p *= Primes_1_000_000[i];
+        } while (p <= B1);
+        SquareAndMultiply(x, n, q);
+    }
     T xm1;
-	sub(xm1, x, oneConst);
-	if (isZero(xm1)) {
-		return one;
-	}
-	T a;
-	gcd(a, xm1, n);
-	if (a != one || B1 >= B2) {
-		return a;
-	}
+    sub(xm1, x, oneConst);
+    if (isZero(xm1)) {
+        return one;
+    }
+    T a;
+    gcd(a, xm1, n);
+    if (a != one || B1 >= B2) {
+        return a;
+    }
 
-	// Stage 2
+    // Stage 2
     uint64_t firstPrime = Primes_1_000_000[i];
     uint64_t prevPrime = firstPrime;
     i += 1;
@@ -89,7 +89,7 @@ template<typename ModType> BigIntValueType<ModType> pMinus1(const ModType& n, ui
         return one;
     }
     gcd(a, xm1, n);
-	return a;
+    return a;
 }
 
 BigInt pMinus1(const BigInt& n, uint64_t B1, uint64_t B2) {

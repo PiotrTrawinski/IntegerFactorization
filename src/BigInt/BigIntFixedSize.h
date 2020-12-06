@@ -97,7 +97,7 @@ private:
 
 template<int Size> struct BigIntParseImpl<BigIntFixedSize<Size>> {
     static BigIntFixedSize<Size> parse(const std::string& str) {
-		return BigIntFixedSize<Size> { str };
+        return BigIntFixedSize<Size> { str };
     }
 };
 
