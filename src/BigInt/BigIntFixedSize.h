@@ -167,9 +167,6 @@ template<int S> void mul(BigIntFixedSize<2*S>& r, const BigIntFixedSize<S>& a, c
 template<int S> void mul(BigIntFixedSize<S>& r, const BigIntFixedSize<S>& a, const BigIntFixedSize<S>& b) {
     BigIntFixedSize<2 * S> dummyRes;
     mul<S, S>(dummyRes, a, b);
-    for (int i = S; i < 2 * S; ++i) {
-        debugAssert(dummyRes[i] == 0);
-    }
     r = dummyRes;
 }
 template<int S> void sqr(BigIntFixedSize<S*2>& r, const BigIntFixedSize<S>& a) {
