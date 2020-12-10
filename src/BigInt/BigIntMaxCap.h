@@ -92,7 +92,7 @@ namespace details {
         }
     }
     template<int C> void shrinkSizeToFit(BigIntMaxCap<C>& r) {
-        while (r.size() >= 1 && r[r.size() - 1] == 0) {
+        while (r.size() > 1 && r[r.size() - 1] == 0) {
             r.size_ -= 1;
         }
     }
@@ -126,12 +126,17 @@ template<int C1, int C2, int C3> void add(BigIntMaxCap<C1>& r, const BigIntMaxCa
     Returns 'false if positive result.
 */
 template<int C1, int C2, int C3> bool sub(BigIntMaxCap<C1>& r, const BigIntMaxCap<C2>& a, const BigIntMaxCap<C3>& b) {
+    debugAssert(a.size() > 0);
+    debugAssert(b.size() > 0);
     auto isNegative = bigIntKernels::sub(r.ptr(), a.ptr(), b.ptr(), a.size(), b.size());
     r.size_ = std::max(a.size(), b.size());
     details::shrinkSizeToFit(r);
+    debugAssert(r.size() > 0);
     return isNegative;
 }
 template<int C1, int C2, int C3> void mul(BigIntMaxCap<C1>& r, const BigIntMaxCap<C2>& a, const BigIntMaxCap<C3>& b) {
+    debugAssert(a.size() > 0);
+    debugAssert(b.size() > 0);
     if (r.ptr() == a.ptr()) {
         auto aCopy = a;
         if (r.ptr() == b.ptr()) {
@@ -150,8 +155,10 @@ template<int C1, int C2, int C3> void mul(BigIntMaxCap<C1>& r, const BigIntMaxCa
     if (r[r.size_ - 1] == 0) {
         r.size_ -= 1;
     }
+    debugAssert(r.size() > 0);
 }
 template<int C1, int C2> void sqr(BigIntMaxCap<C1>& r, const BigIntMaxCap<C2>& a) {
+    debugAssert(a.size() > 0);
     uint64_t tmpStorage[C2 * 2];
     if (r.ptr() == a.ptr()) {
         auto aCopy = a;
@@ -163,73 +170,43 @@ template<int C1, int C2> void sqr(BigIntMaxCap<C1>& r, const BigIntMaxCap<C2>& a
     if (r[r.size_ - 1] == 0) {
         r.size_ -= 1;
     }
+    debugAssert(r.size() > 0);
 }
 template<int C1, int C2> void shr(BigIntMaxCap<C1>& r, const BigIntMaxCap<C2>& a, const uint32_t c) {
-    r.size_ = bigIntKernels::shr(r.ptr(), a.ptr(), c, r.size(), a.size());
-    if (r[r.size_ - 1] == 0) {
-        r.size_ -= 1;
+    debugAssert(a.size() > 0);
+    r.size_ = bigIntKernels::shr(r.ptr(), a.ptr(), c, a.size());
+    if (r.size_ == 0) {
+        r.size_ = 1;
+        r[0] = 0;
     }
+    debugAssert(r.size() > 0);
 }
 template<int C1, int C2> void shl(BigIntMaxCap<C1>& r, const BigIntMaxCap<C2>& a, const uint32_t c) {
+    debugAssert(a.size() > 0);
     r.size_ = bigIntKernels::shl(r.ptr(), a.ptr(), c, a.size());
-    if (r[r.size_ - 1] == 0) {
-        r.size_ -= 1;
-    }
+    debugAssert(r.size() > 0);
 }
-
-
-
-/*
-    Egyptian division algorithm (slow)
-*/
-template<int C1, int C2, int C3, int C4> void div(BigIntMaxCap<C1>& r, const BigIntMaxCap<C2>& a, const BigIntMaxCap<C3>& b, BigIntMaxCap<C4>& rem) {
-    std::vector<BigIntMaxCap<C2>> doublings;
-    BigIntMaxCap<C2> doubling = b;
-
-    int i = 0;
-    for (; ; ++i) {
-        doublings.emplace_back(doubling);
-        doubling <<= 1;
-        if (doubling > a) {
-            break;
-        }
-    }
-
-    r = doublings.back();
-    details::setZero(r, r.size());
-    BigIntMaxCap<C2> accumulator = 0;
-    BigIntMaxCap<C2> tmp = 0;
-    for (; i >= 0; --i) {
-        add(tmp, accumulator, doublings[i]);
-        //tmp = accumulator + doublings[i];
-        if (tmp <= a) {
-            accumulator = tmp;
-            r.bit(i) = 1;
-        }
-    }
-    sub(rem, a, accumulator);
-    //rem = a - accumulator;
-}
-
 template<int C1, int C2, int C3> void div(BigIntMaxCap<C1>& r, const BigIntMaxCap<C2>& a, const BigIntMaxCap<C3>& b) {
-    if (b.size() > a.size()) {
-        r.data[0] = 0;
-        r.size_ = 1;
-        return;
-    }
-    BigIntMaxCap<C1> dummyRem;
-    div(r, a, b, dummyRem);
-    r.size_ = a.size() - b.size() + 1 - (a.size()-b.size() > 0 && r[a.size() - b.size()] == 0);
+    debugAssert(a.size() > 0);
+    debugAssert(b.size() > 0);
+    bigIntKernels::div<C2>(r.ptr(), a.ptr(), b.ptr(), nullptr, a.size(), b.size(), 0);
+    r.size_ = std::max(1, a.size() - b.size() + 1);
+    details::shrinkSizeToFit(r);
+    debugAssert(r.size() > 0);
 }
-
+template<int C1, int C2, int C3> void mod(BigIntMaxCap<C1>& r, const BigIntMaxCap<C2>& a, const BigIntMaxCap<C3>& b) {
+    debugAssert(a.size() > 0);
+    debugAssert(b.size() > 0);
+    uint64_t divRes[C2];
+    bigIntKernels::div<C2>(divRes, a.ptr(), b.ptr(), r.ptr(), a.size(), b.size(), b.size());
+    r.size_ = b.size();
+    details::shrinkSizeToFit(r);
+    debugAssert(r.size() > 0);
+}
 
 /*
     Modular operations using standard modulo
 */
-template<int C1, int C2, int C3> void mod(BigIntMaxCap<C1>& r, const BigIntMaxCap<C2>& a, const BigIntMaxCap<C3>& b) {
-    BigIntMaxCap<C1> dummyDivResult;
-    div(dummyDivResult, a, b, r);
-}
 template<int C1, int C2, int C3, int C4> void modAdd(BigIntMaxCap<C1>& r, const BigIntMaxCap<C2>& a, const BigIntMaxCap<C3>& b, const BigIntMaxCap<C4>& m) {
     add(r, a, b);
     if (r >= m) {
@@ -288,6 +265,7 @@ template<int C> BarretReductionMod<BigIntMaxCap<C>> getBarretReductionMod(const 
     return result;
 }
 template<int C1, int C2, int C3> void mod(BigIntMaxCap<C1>& r, const BigIntMaxCap<C2>& a, const BarretReductionMod<BigIntMaxCap<C3>>& b) {
+    debugAssert(a.size() > 0);
     if (a < b.mod) {
         r = a;
         return;
@@ -299,6 +277,7 @@ template<int C1, int C2, int C3> void mod(BigIntMaxCap<C1>& r, const BigIntMaxCa
     if (r >= b.mod) {
         sub(r, r, b.mod);
     }
+    debugAssert(r.size() > 0);
 }
 template<int C1, int C2, int C3, int C4> void modAdd(BigIntMaxCap<C1>& r, const BigIntMaxCap<C2>& a, const BigIntMaxCap<C3>& b, const BarretReductionMod<BigIntMaxCap<C4>>& m) {
     modAdd(r, a, b, m.mod);
@@ -323,63 +302,40 @@ template<int C1, int C2, int C3> void modDbl(BigIntMaxCap<C1>& r, const BigIntMa
 
 
 template<int C> MontgomeryReductionMod<BigIntMaxCap<C>> getMontgomeryReductionMod(const BigIntMaxCap<C>& n) {
+    debugAssert(n.size() > 0);
     MontgomeryReductionMod<BigIntMaxCap<C>> result;
-    int32_t s = n.size();
     result.mod = n;
-    result.b = s;
-    BigIntMaxCap<C> rInv;
-    BigIntMaxCap<C> r;
-    details::setZero(r, s);
-    r[s] = 1;
-    r.size_ = s + 1;
-    rInv.size_ = s + 1;
-
-    auto mCopy = n;
-    mCopy[s] = 0;
-    uint64_t tmpStorage[C * 11];
-    bigIntKernels::modInv(rInv.ptr(), r.ptr(), mCopy.ptr(), s + 1, tmpStorage);
-
-    BigIntMaxCap<2 * C> r_rInv;
-    details::setZero(r_rInv, s);
-    bigIntKernels::copy(r_rInv.ptr() + s, rInv.ptr(), s + 1, s + 1);
-    r_rInv.size_ = 2 * s + 1;
-
-    BigIntMaxCap<C> one = 1;
-    sub(r_rInv, r_rInv, one);
-    div(result.k, r_rInv, n);
-
+    result.b = n.size();
+    result.k.size_ = bigIntKernels::createMontgomeryReductionMod<C>(result.k.ptr(), result.mod.ptr(), result.b, n.size());
+    debugAssert(result.k.size() > 0);
     return result;
 }
 template<int C> void convertToMontgomeryForm(BigIntMaxCap<C>& r, const BigIntMaxCap<C>& a, const MontgomeryReductionMod<BigIntMaxCap<C>>& m) {
-    mod(r, a << m.b, m.mod);
+    mod(r, a << (64*m.b), m.mod);
+    debugAssert(r.size() > 0);
 }
 template<int C> BigIntMaxCap<C> getValueInMontgomeryForm(const BigIntMaxCap<C>& a, const MontgomeryReductionMod<BigIntMaxCap<C>>& m) {
     BigIntMaxCap<C> r;
     convertToMontgomeryForm(r, a, m);
+    debugAssert(r.size() > 0);
     return r;
 }
 template<int C1, int C2, int C3> void mod(BigIntMaxCap<C1>& r, const BigIntMaxCap<C2>& a, const MontgomeryReductionMod<BigIntMaxCap<C3>>& m) {
-    mul(m.t, a, m.k);
-    m.s = m.t;
+    debugAssert(a.size() > 0);
+    debugAssert(m.k.size() > 0);
+    debugAssert(m.mod.size() > 0);
+    m.s.size_ = m.b;
+    bigIntKernels::copy(m.s.ptr(), a.ptr(), m.s.size(), m.s.size());
+    mul(m.t, m.s, m.k);
+    m.s.size_ = m.b;
+    bigIntKernels::copy(m.s.ptr(), m.t.ptr(), m.s.size(), m.s.size());
     mul(m.t, m.s, m.mod);
     add(m.t, m.t, a);
-    bigIntKernels::copy(r.ptr(), m.t.ptr() + m.b, m.b, m.b);
-    r.size_ = m.t.size() - m.b;
-    if (r >= m.mod) {
+    shr(r, m.t, m.b*64);
+    if (cmp(r, m.mod) >= 0) {
         sub(r, r, m.mod);
     }
-
-    //Limb s[S];
-    //Limb t[2 * S];
-
-    //mul<2 * S, S, S>(t, x, k);
-    //copy<S>(s, t);
-    //mul<2 * S, S, S>(t, s, m);
-    //add<2 * S>(t, t, x);
-    //copy<S>(u, t + S);
-    //if (cmp<S>(u, m) >= 0) {
-    //    sub<S>(u, u, m);
-    //}
+    debugAssert(r.size() > 0);
 }
 
 template<int C1, int C2, int C3, int C4> void modAdd(BigIntMaxCap<C1>& r, const BigIntMaxCap<C2>& a, const BigIntMaxCap<C3>& b, const MontgomeryReductionMod<BigIntMaxCap<C4>>& m) {

@@ -35,6 +35,11 @@ namespace bigIntKernels {
             a[i] = 0;
         }
     }
+    void clear(Int a, int32_t size) {
+        for (int i = 0; i < size; ++i) {
+            a[i] = 0;
+        }
+    }
     template<int Size> int32_t realSize(ConstInt a) {
         for (int i = Size - 1; i >= 0; --i) {
             if (a[i] != 0) {
@@ -410,11 +415,28 @@ namespace bigIntKernels {
                 r[i] = (a[i + partSkipCount] >> shiftSize) | (a[i + 1 + partSkipCount] << (64 - shiftSize));
             }
             if (SA - 1 - partSkipCount < SR) {
-                r[SA - 1 - partSkipCount] = a[SA - 1] >> shiftSize;
+                r[SA - partSkipCount - 1] = a[SA - 1] >> shiftSize;
             }
         }
         for (int i = SA - partSkipCount; i < SR; ++i) {
             r[i] = 0;
+        }
+    }
+    int32_t shr(Int r, ConstInt a, uint32_t c, int32_t sa) {
+        int partSkipCount = c / 64;
+        int shiftSize = c - partSkipCount * 64;
+        if (shiftSize == 0) {
+            for (int i = 0; i < sa - partSkipCount; ++i) {
+                r[i] = a[i + partSkipCount];
+            }
+            return sa - partSkipCount;
+        } else {
+            for (int i = 0; i < sa - partSkipCount - 1; ++i) {
+                r[i] = (a[i + partSkipCount] >> shiftSize) | (a[i + 1 + partSkipCount] << (64 - shiftSize));
+            }
+            auto end = sa - partSkipCount - 1;
+            r[end] = a[sa - 1] >> shiftSize;
+            return sa - partSkipCount - ((end > 0) && r[end] == 0);
         }
     }
 
@@ -463,7 +485,7 @@ namespace bigIntKernels {
         for (int i = 0; i < partSkipCount; ++i) {
             r[i] = 0;
         }
-        return resultMaxIndex + 1;
+        return resultMaxIndex + (r[resultMaxIndex] != 0);
     }
 
     // r = a << 1 (left binary shift by 'c' bits, aka multiplication by 2)
@@ -557,6 +579,38 @@ namespace bigIntKernels {
         shr<SB + 1, SB + 1>(aa, aa, shiftSize);
         copy<SRem>(rem, aa);
     }
+    template<int Capacity> void div(Int r, ConstInt a, ConstInt b, Int rem, int32_t sa, int32_t sb, int32_t srem) {
+        Limb aa[Capacity + 2];
+        Limb bb[Capacity];
+        Limb tmp[Capacity + 1];
+        aa[sa + 1] = 0;
+        aa[sa] = 0;
+
+        auto realSizeB = 64*(sb-1) + ::sizeInBits(b[sb-1]);
+        auto shiftSize = (64 - realSizeB % 64) % 64;
+        auto aaSize = shl(aa, a, shiftSize, sa);
+        shl(bb, b, shiftSize, sb);
+
+        auto realSizeA = 64*(aaSize-1) + ::sizeInBits(aa[aaSize-1]);
+        auto realLimbSizeA = (realSizeA / 64 + 1) - (realSizeA % 64 == 0);
+        auto realLimbSizeB = (realSizeB / 64 + 1) - (realSizeB % 64 == 0);
+
+        clear(r, sa-sb+1);
+        for (int i = realLimbSizeA - realLimbSizeB; i >= 0; --i) {
+            auto d = div128(aa[i + realLimbSizeB], aa[i + realLimbSizeB - 1], bb[realLimbSizeB - 1]);
+            mulLimb(tmp, bb, d, sb);
+            if (sub(&aa[i], &aa[i], tmp, sb+1, sb+1)) {
+                d -= 1;
+                while (sub(&aa[i], bb, &aa[i], sb, sb)) {
+                    d -= 1;
+                }
+            }
+            if (d != 0)
+                r[i] = d;
+        }
+        aaSize = shr(aa, aa, shiftSize, aaSize);
+        copy(rem, aa, srem, srem);
+    }
 
     // r = a / b
     template<int SR, int SA, int SB> void div(Int r, ConstInt a, ConstInt b) {
@@ -617,9 +671,26 @@ namespace bigIntKernels {
             copy<S>(r, s);
         }
     }
-    void modInv(Int r, ConstInt a, ConstInt mod, int32_t s, Int tmpStorage) {
-        copy(tmpStorage, a, s, s);
-        mpn_sec_invert(r, tmpStorage, mod, s, 2 * 64 * s, tmpStorage + s);
+    int32_t modInv(Int r, ConstInt a, ConstInt m, int32_t sa, int32_t sm, Int tmpStorage) {
+        Int aCopy = tmpStorage; tmpStorage += sa;
+        Int mCopy = tmpStorage; tmpStorage += sm;
+        Int g     = tmpStorage; tmpStorage += sm;
+        Int s     = tmpStorage;
+
+        copy(aCopy, a, sa, sa);
+        copy(mCopy, m, sm, sm);
+        clear(s, sm + 1);
+        mp_size_t sSize;
+        mpn_gcdext(g, s, &sSize, aCopy, sa, mCopy, sm);
+        if (sSize < 0) {
+            sSize = -sSize;
+            sub_firstOperandIsBigger(r, m, s, sm, sSize);
+        } else {
+            copy(r, s, sSize, sSize);
+        }
+        return sSize;
+        //copy(tmpStorage, a, s, s);
+        //mpn_sec_invert(r, tmpStorage, m, s, 2 * 64 * s, tmpStorage + s);
     }
 
     // r = gcd(a, b)
@@ -697,6 +768,27 @@ namespace bigIntKernels {
         Limb one = 1;
         sub<2 * S + 1, 2 * S + 1, 1>(r_rInv, r_rInv, &one);
         div<S, 2 * S, S>(k, r_rInv, m);
+    }
+    template<int Capacity> int32_t createMontgomeryReductionMod(Int k, ConstInt m, uint32_t& b, int32_t s) {
+        Limb rInv[Capacity + 1];
+        Limb r[Capacity + 1];
+        Limb mCopy[Capacity + 1];
+        Limb r_rInv[2 * Capacity + 1];
+        Limb invTmpStorage[4 * (Capacity + 1)];
+
+        r[s] = 1;
+        clear(r, s);
+        b = s;
+        copy(mCopy, m, s, s);
+        mCopy[s] = 0;
+        auto rInvSize = modInv(rInv, r, mCopy, s+1, s, invTmpStorage);
+        clear(r_rInv, s);
+        copy(r_rInv+s, rInv, rInvSize, rInvSize);
+        auto r_rInvSize = s + rInvSize;
+        Limb one = 1;
+        sub(r_rInv, r_rInv, &one, r_rInvSize, 1);
+        div<2*Capacity>(k, r_rInv, m, nullptr, r_rInvSize, s, 0);
+        return r_rInvSize - s + (k[r_rInvSize - s] != 0);
     }
     template<int S> void convertToMontgomeryForm(Int r, ConstInt a, ConstInt n, uint32_t b) {
         Limb mulRes[2 * S];
