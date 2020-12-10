@@ -36,18 +36,17 @@ template<int64_t w=2> StackVector<int8_t, 64> wnaf(int64_t e) {
             if (w > 1 && zi >= (1 << (w - 1))) {
                 zi -= (1 << w);
             }
-            if (zi == 1 && z.size() >= 2 && z[z.size() - 2] == -1) {
-                z[z.size() - 1] = 1;
-                z.erase(0);
-                z.emplace_back(1);
-            } else {
-                z.emplace_back((int8_t)zi);
-            }
+            z.emplace_back((int8_t)zi);
             e -= zi;
         } else {
             z.emplace_back(0);
         }
         e /= 2;
+    }
+    if (z.size() >= 3 && z[z.size() - 3] == -1) {
+        z[z.size() - 3] = 1;
+        z[z.size() - 2] = 1;
+        z.size_ -= 1;
     }
     return z;
 }
