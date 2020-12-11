@@ -749,7 +749,11 @@ namespace bigIntKernels {
             Limb a[S];
             int64_t s, x;
             mod<S, S+1, S>(a, r, m);
-            gcdExtended(m[0], a[0], s, x);
+            if (a[0] == 0) {
+                s = 0;
+            } else {
+                gcdExtended(m[0], a[0], s, x);
+            }
             if (s < 0) {
                 rInv[0] = m[0] + s;
             } else {
