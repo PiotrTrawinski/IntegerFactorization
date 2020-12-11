@@ -1,10 +1,12 @@
 #pragma once
+
 #include "../Utility/bitManipulation.h"
 #include "../Utility/debugAssert.h"
 #include "../Utility/alwaysInline.h"
 #include "../PrecomputedTables/modInverseTable.h"
 #include "common.h"
 #include "64bitIntrinsics.h"
+#include "bigIntAsmLib.h"
 #include <cstdint>
 #include <cstring>
 #include <gmp.h>
@@ -804,6 +806,19 @@ namespace bigIntKernels {
     }
 
     template<int S> void montgomeryMult(Int r, ConstInt A, ConstInt B, ConstInt k, ConstInt m, uint32_t b) {
+        #ifdef USE_ASM_LIB
+        if constexpr (S <= 8) {
+            if constexpr (S == 1) montgomeryMult1(r, A, B, k, m, b);
+            if constexpr (S == 2) montgomeryMult2(r, A, B, k, m, b);
+            if constexpr (S == 3) montgomeryMult3(r, A, B, k, m, b);
+            if constexpr (S == 4) montgomeryMult4(r, A, B, k, m, b);
+            if constexpr (S == 5) montgomeryMult5(r, A, B, k, m, b);
+            if constexpr (S == 6) montgomeryMult6(r, A, B, k, m, b);
+            if constexpr (S == 7) montgomeryMult7(r, A, B, k, m, b);
+            if constexpr (S == 8) montgomeryMult8(r, A, B, k, m, b);
+            return;
+        }
+        #endif
         uint64_t t[2 * S];
         if constexpr (S == 1) {
             mul128(t[1], t[0], A[0], B[0]);
@@ -831,6 +846,19 @@ namespace bigIntKernels {
         }
     }
     template<int S> void montgomerySqr(Int r, ConstInt A, ConstInt k, ConstInt m, uint32_t b) {
+        #ifdef USE_ASM_LIB
+        if constexpr (S <= 8) {
+            if constexpr (S == 1) montgomerySqr1(r, A, k, m, b);
+            if constexpr (S == 2) montgomerySqr2(r, A, k, m, b);
+            if constexpr (S == 3) montgomerySqr3(r, A, k, m, b);
+            if constexpr (S == 4) montgomerySqr4(r, A, k, m, b);
+            if constexpr (S == 5) montgomerySqr5(r, A, k, m, b);
+            if constexpr (S == 6) montgomerySqr6(r, A, k, m, b);
+            if constexpr (S == 7) montgomerySqr7(r, A, k, m, b);
+            if constexpr (S == 8) montgomerySqr8(r, A, k, m, b);
+            return;
+        }
+        #endif
         uint64_t t[2 * S];
         sqr<S>(t, A);
         if constexpr (S == 1) {
