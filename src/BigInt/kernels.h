@@ -807,7 +807,7 @@ namespace bigIntKernels {
 
     template<int S> void montgomeryMult(Int r, ConstInt A, ConstInt B, ConstInt k, ConstInt m, uint32_t b) {
         #ifdef USE_ASM_LIB
-        if constexpr (S <= 8) {
+        if constexpr (S > 1 && S <= 6) {
             if constexpr (S == 1) montgomeryMult1(r, A, B, k, m, b);
             if constexpr (S == 2) montgomeryMult2(r, A, B, k, m, b);
             if constexpr (S == 3) montgomeryMult3(r, A, B, k, m, b);
@@ -820,24 +820,34 @@ namespace bigIntKernels {
         }
         #endif
         uint64_t t[2 * S];
+        uint64_t s[2 * S];
         if constexpr (S == 1) {
             mul128(t[1], t[0], A[0], B[0]);
             r[0] = t[0] * k[0];
             auto res = mulAddLimb(t, r, m[0], 1);
             addCarry(0, t[1], t[1], res);
         } else {
-            mulLimb(t, A, B[0], S);
-            for (int i = 1; i < S; ++i) {
-                t[S + i] = mulAddLimb(&t[i], A, B[i], S);
+            if constexpr (S <= 6) {
+                mulLimb(t, A, B[0], S);
+                for (int i = 1; i < S; ++i) {
+                    t[S + i] = mulAddLimb(&t[i], A, B[i], S);
+                }
+            } else {
+                mpn_mul(t, A, S, B, S);
             }
             mulLimbNoLastLimb(r, t, k[0], S);
             for (int i = 1; i < S; ++i) {
                 mulAddLimb(&r[i], t, k[i], S - i);
             }
-            Limb c = 0;
-            for (int i = 0; i < S; ++i) {
-                auto res = mulAddLimb(&t[i], r, m[i], S);
-                c = addCarry((uint8_t)c, t[S + i], t[S + i], res);
+            if constexpr (S <= 6) {
+                Limb c = 0;
+                for (int i = 0; i < S; ++i) {
+                    auto res = mulAddLimb(&t[i], r, m[i], S);
+                    c = addCarry((uint8_t)c, t[S + i], t[S + i], res);
+                }
+            } else {
+                mpn_mul(s, r, S, m, S);
+                mpn_add(t, s, 2 * S, t, S);
             }
         }
         copy<S>(r, t + S);
@@ -847,7 +857,7 @@ namespace bigIntKernels {
     }
     template<int S> void montgomerySqr(Int r, ConstInt A, ConstInt k, ConstInt m, uint32_t b) {
         #ifdef USE_ASM_LIB
-        if constexpr (S <= 8) {
+        if constexpr (S > 1 && S <= 6) {
             if constexpr (S == 1) montgomerySqr1(r, A, k, m, b);
             if constexpr (S == 2) montgomerySqr2(r, A, k, m, b);
             if constexpr (S == 3) montgomerySqr3(r, A, k, m, b);
@@ -860,7 +870,12 @@ namespace bigIntKernels {
         }
         #endif
         uint64_t t[2 * S];
-        sqr<S>(t, A);
+        uint64_t s[2 * S];
+        if constexpr (S <= 5) {
+            sqr<S>(t, A);
+        } else {
+            mpn_sqr(t, A, S);
+        }
         if constexpr (S == 1) {
             r[0] = t[0] * k[0];
             auto res = mulAddLimb(t, r, m[0], 1);
@@ -870,10 +885,15 @@ namespace bigIntKernels {
             for (int i = 1; i < S; ++i) {
                 mulAddLimb(&r[i], t, k[i], S - i);
             }
-            Limb c = 0;
-            for (int i = 0; i < S; ++i) {
-                auto res = mulAddLimb(&t[i], r, m[i], S);
-                c = addCarry((uint8_t)c, t[S + i], t[S + i], res);
+            if constexpr (S <= 6) {
+                Limb c = 0;
+                for (int i = 0; i < S; ++i) {
+                    auto res = mulAddLimb(&t[i], r, m[i], S);
+                    c = addCarry((uint8_t)c, t[S + i], t[S + i], res);
+                }
+            } else {
+                mpn_mul(s, r, S, m, S);
+                mpn_add(t, s, 2 * S, t, S);
             }
         }
         copy<S>(r, t + S);
