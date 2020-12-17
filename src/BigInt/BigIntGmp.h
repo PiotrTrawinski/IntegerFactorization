@@ -19,6 +19,12 @@ struct BigIntGmp {
     BigIntGmp(const BigIntGmp& other) {
         mpz_init_set(data, other.data);
     }
+    BigIntGmp(BigIntGmp&& other) {
+        memcpy(&data[0], &other.data[0], sizeof(mpz_t));
+        other.data->_mp_alloc = 0;
+        other.data->_mp_size = 0;
+        other.data->_mp_d = nullptr;
+    }
     ~BigIntGmp() {
         mpz_clear(data);
     }
@@ -30,8 +36,33 @@ struct BigIntGmp {
         mpz_set(data, other.data);
         return *this;
     }
+    BigIntGmp& operator=(BigIntGmp&& other) {
+        memcpy(&data[0], &other.data[0], sizeof(mpz_t));
+        other.data->_mp_alloc = 0;
+        other.data->_mp_size = 0;
+        other.data->_mp_d = nullptr;
+        return *this;
+    }
     uint64_t operator[](int index) const {
         return mpz_getlimbn(data, index);
+    }
+    mp_limb_t* ptr() {
+        return data->_mp_d;
+    }
+    const mp_limb_t* ptr() const {
+        return data->_mp_d;
+    }
+    int& size() {
+        return data->_mp_size;
+    }
+    int size() const {
+        return data->_mp_size;
+    }
+    int& capacity() {
+        return data->_mp_alloc;
+    }
+    int capacity() const {
+        return data->_mp_alloc;
     }
 };
 template<> struct BigIntParseImpl<BigIntGmp> {
@@ -54,6 +85,115 @@ int sizeInLimbs(const BarretReductionMod<BigIntGmp>& a) {
 int sizeInLimbs(const MontgomeryReductionMod<BigIntGmp>& a) {
     return (int)mpz_size(a.mod.data);
 }
+int nonZeroLimbCount(const mp_limb_t* ptr, int size) {
+    while (size > 1 && ptr[size - 1] == 0) {
+        size -= 1;
+    }
+    return size;
+}
+void _fastModLimb(BigIntGmp& r, const BigIntGmp& a, uint32_t b) {
+    int maxSize = std::min<int>(a.size(), b);
+    memcpy(r.ptr(), a.ptr(), maxSize * sizeof(mp_limb_t));
+    r.size() = nonZeroLimbCount(r.ptr(), maxSize);
+}
+void _fastDivLimb(BigIntGmp& r, const BigIntGmp& a, uint32_t b) {
+    int maxSize = std::max<int>(a.size() - b, 0);
+    memcpy(r.ptr(), a.ptr()+b, maxSize * sizeof(mp_limb_t));
+    r.size() = nonZeroLimbCount(r.ptr(), maxSize);
+}
+void _fastMul(mpz_t& r, const mpz_t& a, const mpz_t& b) {
+    auto lastLimb = mpn_mul(r->_mp_d, a->_mp_d, a->_mp_size, b->_mp_d, b->_mp_size);
+    r->_mp_size = a->_mp_size + b->_mp_size - (lastLimb == 0);
+}
+void _fastMul(BigIntGmp& r, const BigIntGmp& a, const BigIntGmp& b) {
+    debugAssert(r.capacity() >= a.size() + b.size());
+    debugAssert(a.size() != 0);
+    if (a.size() != 0 && b.size() != 0) {
+        debugAssert(a.size() >= b.size());
+        _fastMul(r.data, a.data, b.data);
+    } else {
+        r.size() = 0;
+    }
+}
+int _fastMul(mp_limb_t* rPtr, const mp_limb_t* aPtr, int aSize, const mp_limb_t* bPtr, int bSize) {
+    if (aSize > 0 && bSize > 0) {
+        auto lastLimb = mpn_mul(rPtr, aPtr, aSize, bPtr, bSize);
+        return aSize + bSize - (lastLimb == 0);
+    } else {
+        return 0;
+    }
+}
+void fastMul(BigIntGmp& r, const BigIntGmp& a, const BigIntGmp& b) {
+    if (a.size() == 0 || b.size() == 0) {
+        r.size() = 0;
+        return;
+    }
+    if (r.capacity() < a.size() + b.size()) {
+        mpz_realloc(r.data, a.size() + b.size());
+    }
+    constexpr int BufferSize = 1024;
+    mp_limb_t aBuffer[BufferSize];
+    mp_limb_t bBuffer[BufferSize];
+    mpz_t aCopy;
+    mpz_t bCopy;
+    const mpz_t* aPtr = &a.data;
+    const mpz_t* bPtr = &b.data;
+    if (r.ptr() == (*aPtr)->_mp_d) {
+        aCopy->_mp_size = a.size();
+        if (a.size() < BufferSize) {
+            aCopy->_mp_d = aBuffer;
+        } else {
+            aCopy->_mp_d = (mp_limb_t*)malloc(a.size() * sizeof(mp_limb_t));
+        }
+        memcpy(aCopy->_mp_d, a.ptr(), a.size() * sizeof(mp_limb_t));
+        aPtr = &aCopy;
+    }
+    if (r.ptr() == (*bPtr)->_mp_d) {
+        bCopy->_mp_size = b.size();
+        if (a.size() < BufferSize) {
+            bCopy->_mp_d = bBuffer;
+        } else {
+            bCopy->_mp_d = (mp_limb_t*)malloc(b.size() * sizeof(mp_limb_t));
+        }
+        memcpy(bCopy->_mp_d, b.ptr(), b.size() * sizeof(mp_limb_t));
+        bPtr = &bCopy;
+    }
+    if ((*aPtr)->_mp_size < (*bPtr)->_mp_size) {
+        std::swap(aPtr, bPtr);
+    }
+    _fastMul(r.data, *aPtr, *bPtr);
+}
+void fastSqr(BigIntGmp& r, const BigIntGmp& a) {
+    if (a.size() == 0) {
+        r.size() = 0;
+        return;
+    }
+    if (r.capacity() < 2*a.size()) {
+        mpz_realloc(r.data, 2*a.size());
+    }
+    constexpr int BufferSize = 2048;
+    mp_limb_t aBuffer[BufferSize];
+    mpz_t aCopy;
+    const mpz_t* aPtr = &a.data;
+    if (r.ptr() == (*aPtr)->_mp_d) {
+        aCopy->_mp_size = a.size();
+        if (a.size() < BufferSize) {
+            aCopy->_mp_d = aBuffer;
+        } else {
+            aCopy->_mp_d = (mp_limb_t*)malloc(a.size() * sizeof(mp_limb_t));
+        }
+        memcpy(aCopy->_mp_d, a.ptr(), a.size() * sizeof(mp_limb_t));
+        aPtr = &aCopy;
+    }
+    mpn_sqr(r.ptr(), (*aPtr)->_mp_d, a.size());
+    r.size() = 2 * a.size() - (r.ptr()[2*a.size()-1] == 0);
+}
+void _fastAdd(BigIntGmp& r, const BigIntGmp& a, const BigIntGmp& b) {
+    debugAssert(a.size() >= b.size());
+    auto lastLimb = mpn_add(r.ptr(), a.ptr(), a.size(), b.ptr(), b.size());
+    r.ptr()[a.size()] = lastLimb;
+    r.size() = a.size() + lastLimb;
+}
 void swap(BigIntGmp& a, BigIntGmp& b) {
     std::swap(a.data, b.data);
 }
@@ -68,10 +208,10 @@ void absSub(BigIntGmp& r, const BigIntGmp& a, const BigIntGmp& b) {
     mpz_abs(r.data, r.data);
 }
 void mul(BigIntGmp& r, const BigIntGmp& a, const BigIntGmp& b) {
-    mpz_mul(r.data, a.data, b.data);
+    fastMul(r, a, b);
 }
 void sqr(BigIntGmp& r, const BigIntGmp& a) {
-    mpz_mul(r.data, a.data, a.data);
+    fastSqr(r, a);
 }
 void div(BigIntGmp& r, const BigIntGmp& a, const BigIntGmp& b) {
     mpz_div(r.data, a.data, b.data);
@@ -177,15 +317,18 @@ BigIntGmp operator*(const BigIntGmp& a, const BigIntGmp& b) {
     mul(r, a, b);
     return r;
 }
-
 void mod(BigIntGmp& u, const BigIntGmp& x, const MontgomeryReductionMod<BigIntGmp>& m) {
-    mpz_mod_2exp(m.s.data, x.data, m.b * 64);
-    mul(m.t, m.s, m.k);
-    mpz_mod_2exp(m.s.data, m.t.data, m.b * 64);
-    mul(m.t, m.s, m.mod);
-    add(m.t, m.t, x);
-    mpz_div_2exp(u.data, m.t.data, m.b * 64);
-    if (mpz_cmp(u.data, m.mod.data) >= 0) {
+    if (m.s.capacity() == 0)
+        mpz_realloc(m.s.data, 2 * m.b + 1);
+    if (m.t.capacity() == 0)
+        mpz_realloc(m.t.data, 2 * m.b + 1);
+    if (u.capacity() == 0)
+        mpz_realloc(u.data, m.b + 1);
+    m.t.size() = _fastMul(m.t.ptr(), m.k.ptr(), m.k.size(), x.ptr(), std::min<int>(x.size(), m.b));
+    m.s.size() = _fastMul(m.s.ptr(), m.mod.ptr(), m.mod.size(), m.t.ptr(), std::min<int>(m.t.size(), m.b));
+    _fastAdd(m.s, m.s, x);
+    _fastDivLimb(u, m.s, m.b);
+    if (cmp(u, m.mod) >= 0) {
         sub(u, u, m.mod);
     }
 }
@@ -333,7 +476,7 @@ BigIntGmp getConstant(uint64_t a, const MontgomeryReductionMod<BigIntGmp>& m) {
 }
 
 uint32_t mod(const BigIntGmp& a, uint32_t m, [[maybe_unused]] int tableEntryId) {
-    return (uint32_t)mpn_mod_1(a.data->_mp_d, sizeInLimbs(a), m);
+    return (uint32_t)mpn_mod_1(a.ptr(), sizeInLimbs(a), m);
 }
 
 
