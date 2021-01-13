@@ -35,3 +35,5 @@ template<typename Type> CurvePoint<Type> toAffine(const CurvePoint<Type>& point,
     }
     return result;
 }
+
+template<typename ValType, typename ModType> struct EllipticCurve;

@@ -146,15 +146,15 @@ template<typename CostFunction> std::pair<int, StackVector<int8_t, 64>> getBestW
     int bestWNaf = std::get<0>(bestNafForm);
     return { bestWNaf, std::get<1>(bestNafForm) };
 }
-template<template<typename, typename> typename CurveType, typename Type, typename ModType> void dnafMul(EcmContext& context, CurveType<Type, ModType>& curve, CurvePoint<Type>& p, uint64_t n) {
+template<typename Type, typename ModType> void dnafMul(EcmContext& context, EllipticCurve<Type, ModType>& curve, CurvePoint<Type>& p, uint64_t n) {
     if (n == 0) { p = curve.zero(); return; }
     if (n == 1) return;
 
     int bestWNaf = 0;
-    if constexpr (std::is_same_v<CurveType<Type, ModType>, TwistedEdwardsExtended<Type, ModType>>) {
+    if (curve.form == EllipticCurveForm::TwistedEdwards) {
         auto [bestW, nafForm] = getBestWNaf(n, [](auto& a) { return nafCost(a, 8, 8, 8, 8); });
         bestWNaf = bestW;
-    } else if constexpr (std::is_same_v<CurveType<Type, ModType>, ShortWeierstrassProjective<Type, ModType>>) {
+    } else if (curve.form == EllipticCurveForm::Montgomery) {
         auto [bestW, nafForm] = getBestWNaf(n, [](auto& a) { return nafCost(a, 12, 14, 12, 14); });
         bestWNaf = bestW;
     } else {

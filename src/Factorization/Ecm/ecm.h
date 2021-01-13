@@ -1,6 +1,7 @@
 #pragma once
 #include "../../BigInt/include.h"
 #include "curves/common.h"
+#include "curves/EllipticCurve.h"
 #include "common.h"
 #include "cascadeMultiplication.h"
 #include <cstdint>
@@ -97,4 +98,14 @@ template<template<typename,typename> typename CurveType, typename ModType> BigIn
 
 template<template<typename, typename> typename CurveType> BigInt ecm(EcmContext& context, const BigInt& n) {
     return n.visit([&context](auto&& a) { return BigInt{ ecm<CurveType>(context, a) }; });
+}
+
+template<typename ModType> BigIntValueType<ModType> ecm(EcmContext& context, EllipticCurveForm form, const ModType& mod) {
+    EllipticCurve<BigIntValueType<ModType>, ModType> curve(form);
+    curve.mod = mod;
+    return ecm_(context, curve);
+}
+
+BigInt ecm(EcmContext& context, EllipticCurveForm form, const BigInt& n) {
+    return n.visit([&context, form](auto&& a) { return BigInt{ ecm(context, form, a) }; });
 }

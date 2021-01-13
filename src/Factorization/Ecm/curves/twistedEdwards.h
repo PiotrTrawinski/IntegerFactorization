@@ -5,38 +5,15 @@
 #include "shortWeierstrass.h"
 #include <tuple>
 #include <array>
-#include <iostream>
 #include <unordered_map>
 
-template<typename T, typename U=T> struct TwistedEdwardsExtended {
-    using ValueType = T;
-    
-    U mod;
-    std::array<T, 4> tmp;
-    uint64_t k;
-
-    uint64_t defaultSeed() {
-        return 2;
-    }
-    CurvePoint<T> initializeCurveAndPoint(uint64_t seed) {
-        k = seed;
-        return generateCurvePoint(*this, k);
-    }
-    void generateNewCurveAndPoint(CurvePoint<T>& out_point) {
-        k += 1;
-        out_point = generateCurvePoint(*this, k);
-    }
-    CurvePoint<T> zero() {
-        return CurvePoint<T> { getConstant(0, mod), getConstant(1, mod), getConstant(0, mod), getConstant(0, mod) }; // TODO check what should it be
-    }
-};
 
 // Input  = Extended
 // Output =
 // Extended:     8M + 0S + 10D
 // Projective:   7M + 0S + 10D
 // MontgomeryXY: 4M + 0S + 12D
-template<typename Type, typename ModType> void _addsub(TwistedEdwardsExtended<Type, ModType>& curve, CurvePoint<Type>& p, const CurvePoint<Type>& q, CoordinateSystem outputSystem = CoordinateSystem::Extended, bool isAdd = true) {
+template<typename Type, typename ModType> void _twistedEdwardsAddsub(EllipticCurve<Type, ModType>& curve, CurvePoint<Type>& p, const CurvePoint<Type>& q, CoordinateSystem outputSystem = CoordinateSystem::Extended, bool isAdd = true) {
     debugAssert(outputSystem == CoordinateSystem::Extended || outputSystem == CoordinateSystem::Projective || outputSystem == CoordinateSystem::MontgomeryXY, "Unsupported output coordinate system");
     auto [Px, Py, Pz, Pt, Qx, Qy, Qz, Qt, u0, u1, u2] = modArithm::createContext(
         curve.mod, p.x, p.y, p.z, p.t, q.x, q.y, q.z, q.t, curve.tmp[0], curve.tmp[1], curve.tmp[2]
@@ -87,15 +64,11 @@ template<typename Type, typename ModType> void _addsub(TwistedEdwardsExtended<Ty
         Px = Px + u0;
     }
 }
-template<typename Type, typename ModType> void add(TwistedEdwardsExtended<Type, ModType>& curve, CurvePoint<Type>& p, const CurvePoint<Type>& q, CoordinateSystem outputSystem = CoordinateSystem::Extended) {
-    _addsub(curve, p, q, outputSystem, true);
+template<typename Type, typename ModType> void twistedEdwardsAdd(EllipticCurve<Type, ModType>& curve, CurvePoint<Type>& p, const CurvePoint<Type>& q) {
+    _twistedEdwardsAddsub(curve, p, q, CoordinateSystem::Extended, true);
 }
-template<typename Type, typename ModType> void sub(TwistedEdwardsExtended<Type, ModType>& curve, CurvePoint<Type>& p, const CurvePoint<Type>& q, CoordinateSystem outputSystem = CoordinateSystem::Extended) {
-    _addsub(curve, p, q, outputSystem, false);
-}
-template<typename Type, typename ModType> void diffAdd(TwistedEdwardsExtended<Type, ModType>& curve, CurvePoint<Type>& r, const CurvePoint<Type>& p, const CurvePoint<Type>& q, const CurvePoint<Type>& pmq) {
-    r = p;
-    add(curve, r, q);
+template<typename Type, typename ModType> void twistedEdwardsSub(EllipticCurve<Type, ModType>& curve, CurvePoint<Type>& p, const CurvePoint<Type>& q) {
+    _twistedEdwardsAddsub(curve, p, q, CoordinateSystem::Extended, false);
 }
 
 
@@ -103,7 +76,8 @@ template<typename Type, typename ModType> void diffAdd(TwistedEdwardsExtended<Ty
 // Output =
 // Extended:   4M + 4S + 6D
 // Projective: 3M + 4S + 6D
-template<typename Type, typename ModType> void dbl(TwistedEdwardsExtended<Type, ModType>& curve, CurvePoint<Type>& p, CoordinateSystem outputSystem = CoordinateSystem::Extended) {
+template<typename Type, typename ModType> void twistedEdwardsDbl(EllipticCurve<Type, ModType>& curve, CurvePoint<Type>& p) {
+    CoordinateSystem outputSystem = CoordinateSystem::Extended;
     debugAssert(outputSystem == CoordinateSystem::Extended || outputSystem == CoordinateSystem::Projective, "Unsupported output coordinate system");
     auto [X, Y, Z, T, u, v, xxx] = modArithm::createContext(curve.mod, p.x, p.y, p.z, p.t, curve.tmp[0], curve.tmp[1], curve.tmp[2]);
     
@@ -121,17 +95,14 @@ template<typename Type, typename ModType> void dbl(TwistedEdwardsExtended<Type, 
     Y = Y * u;
     Z = u * v;
 }
-template<typename Type, typename ModType> void dbl(TwistedEdwardsExtended<Type, ModType>& curve, CurvePoint<Type>& r, const CurvePoint<Type>& p) {
-    r = p;
-    dbl(curve, r);
-}
 
 
 // Input  = Extended || Projective
 // Output =
 // Extended:   11M + 3S + 10D
 // Projective:  9M + 3S + 10D
-template<typename Type, typename ModType> void tpl(TwistedEdwardsExtended<Type, ModType>& curve, CurvePoint<Type>& p, CoordinateSystem outputSystem = CoordinateSystem::Extended) {
+template<typename Type, typename ModType> void twistedEdwardsTpl(EllipticCurve<Type, ModType>& curve, CurvePoint<Type>& p) {
+    CoordinateSystem outputSystem = CoordinateSystem::Extended;
     debugAssert(outputSystem == CoordinateSystem::Extended || outputSystem == CoordinateSystem::Projective, "Unsupported output coordinate system");
     auto [X, Y, Z, T, a, b, c, d] = modArithm::createContext(curve.mod, p.x, p.y, p.z, p.t, curve.tmp[0], curve.tmp[1], curve.tmp[2], curve.tmp[3]);
 
@@ -167,7 +138,8 @@ template<typename Type, typename ModType> void tpl(TwistedEdwardsExtended<Type, 
     }
 }
 
-template<typename Type, typename ModType> CurvePoint<Type> generateCurvePoint(TwistedEdwardsExtended<Type, ModType>& curve, uint64_t k, CoordinateSystem outputSystem = CoordinateSystem::Extended) {
+
+template<typename Type, typename ModType> CurvePoint<Type> twistedEdwardsGenerateCurvePoint(EllipticCurve<Type, ModType>& curve, uint64_t k, CoordinateSystem outputSystem = CoordinateSystem::Extended) {
     debugAssert(outputSystem == CoordinateSystem::Extended || outputSystem == CoordinateSystem::Projective || outputSystem == CoordinateSystem::MontgomeryXY, "Unsupported output coordinate system");
     debugAssert(k != 0);
     
@@ -270,3 +242,4 @@ template<typename Type, typename ModType> CurvePoint<Type> generateCurvePoint(Tw
 
     return result;
 }
+
