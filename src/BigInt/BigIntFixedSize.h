@@ -402,6 +402,13 @@ template<int S1, int S2> bool operator<=(const BigIntFixedSize<S1>& a, const Big
 template<int S1, int S2> bool operator==(const BigIntFixedSize<S1>& a, const BigIntFixedSize<S2>& b) {
     return cmp(a, b) == 0;
 }
+template<int S> bool operator==(const BigIntFixedSize<S>& a, int b) {
+    if constexpr (S == 1) {
+        return a[0] == b;
+    } else {
+        return a[0] == b && a.realSize() == 1;
+    }
+}
 template<int S1, int S2> bool operator==(const BarretReductionMod<BigIntFixedSize<S1>>& a, const BarretReductionMod<BigIntFixedSize<S2>>& b) {
     return cmp(a.mod, b.mod) == 0;
 }
