@@ -254,9 +254,18 @@ uint64_t trialDivision(uint64_t n, uint64_t bound=MaxU64) {
     std::size_t wheelIndex = 0;
     return trialDivision(n, biggestFactorChecked, currentTableEntryId, wheelIndex, bound);
 }
-//std::vector<uint64_t> trialDivisionAll(uint64_t n) {
-//    return trialDivisionSingleAll(n);
-//}
+std::vector<uint64_t> trialDivisionAll(uint64_t n, uint64_t bound=MaxU64) {
+    std::vector<uint64_t> factors;
+    uint64_t biggestFactorChecked = 2;
+    std::size_t currentTableEntryId = 0;
+    std::size_t wheelIndex = 0;
+    while (true) {
+        factors.emplace_back(trialDivision(n, biggestFactorChecked, currentTableEntryId, wheelIndex, bound));
+        if (n == factors.back())
+            return factors;
+        n /= factors.back();
+    }
+}
 
 template<typename T> T trialDivision(const T& n, uint64_t bound) {
     std::size_t currentTableEntryId = 0;
