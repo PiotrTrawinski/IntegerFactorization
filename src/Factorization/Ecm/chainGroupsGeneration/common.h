@@ -2,6 +2,8 @@
 
 #include <cstdint>
 #include <vector>
+#include <functional>
+#include <iomanip>
 #include "../../../PrecomputedTables/primeTable.h"
 #include "../multiplicationMethods/wnafMul.h"
 
@@ -16,51 +18,43 @@ std::vector<uint64_t> createAllB1SmoothPrimes(uint64_t B1) {
 }
 
 struct NumberWithCost {
-    NumberWithCost(uint64_t number, uint64_t B1) : number(number) {
-        auto factNum = number;
-        while (factNum != 1) {
-            auto factor = trialDivision(factNum, B1);
-            factors.emplace_back(factor);
-            factNum /= factor;
-        }
-        double avgFactorSize = 0;
-        for (auto factor : factors) {
-            avgFactorSize += factor;
-        }
-        avgFactorSize /= factors.size();
-        avgFactorSize = std::pow(avgFactorSize, 1.0 / 8.0);
-        //avgFactorSize = std::sqrt(avgFactorSize);
+    NumberWithCost() {}
+    NumberWithCost(uint64_t number, double cost, const std::vector<uint64_t>& factors) : number(number), cost(cost), factors(factors) {}
 
-        auto [bestWNaf, bestNafForm] = getBestWNaf(number, [&](auto& naf) {
-            auto [dblCount, addCount] = nafDblAddCounts(naf);
-            auto cost = (double)addCount / dblCount;
-            return cost;
-        });
-        nafForm = bestNafForm;
-        auto [dblCountX, addCountX] = nafDblAddCounts(nafForm);
-        dblCount = dblCountX;
-        addCount = addCountX;
-        cost_ = (1 / avgFactorSize)*(double)addCount / dblCount;
-    }
     uint64_t number;
-    int dblCount;
-    int addCount;
-    double cost_;
-    StackVector<int8_t, 64> nafForm;
-    std::string method;
+    double cost;
     std::vector<uint64_t> factors;
-
-    double cost() {
-        return cost_;// (double)setBitCount / bitCount;
-    }
 };
 
-std::vector<NumberWithCost> convertToNumbersWithCost(const std::vector<uint64_t>& numbers, uint64_t B1) {
+NumberWithCost createNumberWithCost(uint64_t n, uint64_t B1, std::function<double(uint64_t)> costFunction) {
+    return NumberWithCost(n, costFunction(n), trialDivisionAll(n, B1));
+}
+std::vector<NumberWithCost> createNumbersWithCosts(const std::vector<uint64_t>& nums, uint64_t B1, std::function<double(uint64_t)> costFunction) {
     std::vector<NumberWithCost> result;
-    for (auto number : numbers) {
-        result.emplace_back(number, B1);
+    for (auto n : nums) {
+        result.push_back(createNumberWithCost(n, B1, costFunction));
     }
     return result;
+}
+double naf2AddCountCost(uint64_t n) {
+    return nafCost(wnaf<2>(n), 0, 1, 0, 1);
+}
+std::function<double(uint64_t)> costDividedBySize(std::function<double(uint64_t)> costFunction) {
+    return [costFunction](uint64_t n) {
+        return costFunction(n) / sizeInBits(n);
+    };
+}
+
+void printPartition(const std::vector<NumberWithCost>& numbers) {
+    writeln("results:");
+    double totalCost = 0;
+    for (auto& n : numbers) {
+        std::cout << std::setw(20) << n.number << " ";
+        std::cout << std::setw(50) << toString(n.factors) << " ";
+        std::cout << std::endl;
+        totalCost += n.cost;
+    }
+    writeln("totalCost = ", totalCost);
 }
 
 bool contains(const std::vector<uint64_t>& primes, const std::vector<uint64_t>& factors) {

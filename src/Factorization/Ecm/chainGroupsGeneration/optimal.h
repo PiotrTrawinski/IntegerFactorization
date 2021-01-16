@@ -6,7 +6,7 @@
 #include <iostream>
 #include <limits>
 
-std::vector<uint64_t> optimalPrimePartition(const std::vector<int>& multiplicities, const std::vector<uint64_t>& primes, const std::unordered_map<uint64_t, int>& costs) {
+std::vector<uint64_t> optimalPrimePartition(const std::vector<int>& multiplicities, const std::vector<uint64_t>& primes, const std::unordered_map<uint64_t, double>& costs) {
     /*
         Based on Knuth's "THE ART OF COMPUTER PROGRAMMING"
         algorithm M (Multipartitions in dereasing lexiographic order)
@@ -21,7 +21,7 @@ std::vector<uint64_t> optimalPrimePartition(const std::vector<int>& multipliciti
     std::vector<int> f(n + 1, 0);
 
     std::vector<uint64_t> bestPartition;
-    int bestCost = std::numeric_limits<int>::max();
+    double bestCost = std::numeric_limits<double>::max();
 
     // Step M1
     for (int j = 0; j < m; ++j) {
@@ -70,7 +70,7 @@ std::vector<uint64_t> optimalPrimePartition(const std::vector<int>& multipliciti
         }
 
         // Step M4
-        int cost = 0;
+        double cost = 0;
         for (int i = 0; i <= lPart; ++i) {
             uint64_t number = 1;
             for (int j = f[i]; j < f[i + 1]; ++j) {
@@ -96,12 +96,12 @@ std::vector<uint64_t> optimalPrimePartition(const std::vector<int>& multipliciti
                 bestPartition.emplace_back(number);
             }
             bestCost = cost;
-            std::cout << cost << "\t";
-            std::cout << bestPartition[0];
-            for (std::size_t i = 1; i < bestPartition.size(); ++i) {
-                std::cout << " " << bestPartition[i];
-            }
-            std::cout << '\n';
+            //std::cout << cost << "\t";
+            //std::cout << bestPartition[0];
+            //for (std::size_t i = 1; i < bestPartition.size(); ++i) {
+            //    std::cout << " " << bestPartition[i];
+            //}
+            //std::cout << '\n';
         }
 
         // Step M5
@@ -147,7 +147,7 @@ bool nextMultisetSubset(const std::vector<int>& multiplicities, std::vector<int>
     return changed;
 }
 
-void optimalChainGroup(uint64_t B1) {
+void optimalChainGroup(uint64_t B1, std::function<double(uint64_t)> costFunction) {
     auto primes = createAllB1SmoothPrimes(B1);
     while (primes[0] == 2) {
         primes.erase(primes.begin());
@@ -167,7 +167,7 @@ void optimalChainGroup(uint64_t B1) {
     }
 
     std::vector<int> counts(primeMultiplicities.size(), 0);
-    std::unordered_map<uint64_t, int> costs;
+    std::unordered_map<uint64_t, double> costs;
     counts.back() = 1;
     do {
         uint64_t number = 1;
@@ -180,10 +180,7 @@ void optimalChainGroup(uint64_t B1) {
                 }
             }
         }
-        auto [bestWNaf, bestNafForm] = getBestWNaf(number, [&](auto& naf) {
-            return nafCost(naf, 8, 8, 8, 8);
-        });
-        costs[number] = nafCost(bestNafForm, 8, 8, 8, 8);
+        costs[number] = costFunction(number);
     } while (nextMultisetSubset(primeMultiplicities, counts, (int)counts.size()));
     auto bestPartition = optimalPrimePartition(primeMultiplicities, primesUnique, costs);
 }
