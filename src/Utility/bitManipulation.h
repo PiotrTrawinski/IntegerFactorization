@@ -49,3 +49,12 @@ uint64_t bitSetCount(uint64_t a) {
     return __builtin_popcountll(a);
 #endif
 }
+
+uint64_t trailingZeroBitCount(uint64_t a) {
+#if defined(_WIN32)
+    return __popcnt64((a & -a) - 1);
+#else
+    return __builtin_ctzll(a);
+#endif
+}
+
