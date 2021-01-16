@@ -388,6 +388,9 @@ void modDbl(BigIntGmp& r, const BigIntGmp& a, const MontgomeryReductionMod<BigIn
 void modInv(BigIntGmp& r, const BigIntGmp& a, const MontgomeryReductionMod<BigIntGmp>& m) {
     modInv(r, a, m.mod);
 }
+void modPow(BigIntGmp& r, const BigIntGmp& a, const BigIntGmp& e, const BigIntGmp& m) {
+    mpz_powm(r.data, a.data, e.data, m.data);
+}
 
 
 BarretReductionMod<BigIntGmp> getBarretReductionMod(const BigIntGmp& n) {
