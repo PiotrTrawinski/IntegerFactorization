@@ -317,6 +317,16 @@ BigIntGmp operator*(const BigIntGmp& a, const BigIntGmp& b) {
     mul(r, a, b);
     return r;
 }
+BigIntGmp operator-(const BigIntGmp& a, const BigIntGmp& b) {
+    BigIntGmp r;
+    sub(r, a, b);
+    return r;
+}
+BigIntGmp operator+(const BigIntGmp& a, const BigIntGmp& b) {
+    BigIntGmp r;
+    add(r, a, b);
+    return r;
+}
 void mod(BigIntGmp& u, const BigIntGmp& x, const MontgomeryReductionMod<BigIntGmp>& m) {
     if (m.s.capacity() == 0)
         mpz_realloc(m.s.data, 2 * m.b + 1);
