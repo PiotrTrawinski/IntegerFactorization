@@ -162,43 +162,154 @@ std::vector<uint64_t> readB1SmoothNumbers(const std::string& inFileName) {
     return result;
 }
 
+void setRatios(std::vector<double>& ratios, const std::vector<uint64_t>& factors) {
+    for (auto& ratio : ratios) {
+        ratio = 0;
+    }
+    for (auto& factor : factors) {
+        ratios[sizeInBits(factor)-1] += 1;
+    }
+    for (auto& ratio : ratios) {
+        ratio /= factors.size();
+    }
+}
 
-std::vector<NumberWithCost> bosKleinjung(std::function<double(uint64_t)> costFunction) {
+struct NumberBosKleinjung {
+    NumberBosKleinjung() {}
+    NumberBosKleinjung(uint64_t number, double cost, const std::vector<uint64_t>& factors, int ratioSize) : number(number), cost(cost), factors(factors) {
+        ratios.resize(ratioSize, 0);
+        setRatios(ratios, factors);
+    }
+    void calculateScore(const std::vector<double>& primeRatios) {
+        score = 0;
+        for (int i = 0; i < primeRatios.size(); ++i) {
+            if (primeRatios[i] != 0) {
+                score += ratios[i] / primeRatios[i];
+            }
+        }
+    }
+
+    uint64_t number;
+    double cost;
+    double score;
+    std::vector<double> ratios;
+    std::vector<uint64_t> factors;
+};
+
+bool canCreateNumberBosKleinjung(uint64_t n, uint64_t B1) {
+    auto factors = trialDivisionAll(n, B1);
+    return factors.back() <= B1;
+}
+NumberBosKleinjung createNumberBosKleinjung(uint64_t n, uint64_t B1, std::function<double(uint64_t)> costFunction) {
+    return NumberBosKleinjung(n, costFunction(n), trialDivisionAll(n, B1), sizeInBits(B1));
+}
+std::vector<NumberBosKleinjung> createumbersBosKleinjung(const std::vector<uint64_t>& nums, uint64_t B1, std::function<double(uint64_t)> costFunction) {
+    std::vector<NumberBosKleinjung> result;
+    for (auto n : nums) {
+        if (canCreateNumberBosKleinjung(n, B1)) {
+            result.push_back(createNumberBosKleinjung(n, B1, costFunction));
+        }
+    }
+    return result;
+}
+NumberWithCost convertToNumberWithCost(const NumberBosKleinjung& number) {
+    return NumberWithCost(number.number, number.cost, number.factors);
+}
+
+void printPartitionUsingCost(const std::vector<NumberWithCost>& numbers, std::function<double(uint64_t)> costFunction) {
+    writeln("results:");
+    double totalCost = 0;
+    for (auto& n : numbers) {
+        std::cout << std::setw(20) << n.number << " ";
+        std::cout << std::setw(50) << toString(n.factors) << " ";
+        std::cout << std::endl;
+        totalCost += costFunction(n.number);
+    }
+    writeln("totalCost = ", totalCost);
+}
+
+void bosKleinjungUpdate(std::vector<NumberBosKleinjung>& numbersWithCost, std::vector<double>& primeRatios, const std::vector<uint64_t>& primes) {
+    setRatios(primeRatios, primes);
+
+    numbersWithCost.erase(std::remove_if(numbersWithCost.begin(), numbersWithCost.end(), [&primes](auto& a) {
+        return !contains(primes, a.factors);
+    }), numbersWithCost.end());
+    for (auto& number : numbersWithCost) {
+        number.calculateScore(primeRatios);
+    }
+    std::sort(numbersWithCost.begin(), numbersWithCost.end(), [](auto& a, auto& b) {
+        return a.score < b.score;
+    });
+}
+
+std::vector<NumberWithCost> bosKleinjung(std::function<double(uint64_t)> costFunction, std::function<double(uint64_t)> evalFunction) {
     //generateNumbersWithSparseBinaryRepresentations("TEST_FILE_60_7.dat", 60, 7);
     //generateSpraseB1SmoothNumbers("TEST_FILE_60_7.dat", "SMOOTH_TEST_60_7_256.dat", 256);
     auto numbers = readB1SmoothNumbers("SMOOTH_TEST_60_7_256.dat");
-    int B1 = 256;
+    int B1 = 31;
     std::sort(numbers.begin(), numbers.end());
     if (numbers[0] == 1) { // should always be true, but checking to be sure.
         numbers.erase(numbers.begin());
     }
 
-    auto numbersWithCost = createNumbersWithCosts(numbers, B1, costFunction);
-    std::sort(numbersWithCost.begin(), numbersWithCost.end(), [](auto& a, auto& b) {
-        return a.cost < b.cost;
-    });
-
+    auto numbersWithCost = createumbersBosKleinjung(numbers, B1, costFunction);
     auto primes = createAllB1SmoothPrimes(B1);
     while (primes[0] == 2) {
         primes.erase(primes.begin());
     }
+    std::vector<double> primeRatios(sizeInBits(B1), 0);
+    
+    bosKleinjungUpdate(numbersWithCost, primeRatios, primes);
+
+    auto [minCostIter, maxCostIter] = std::minmax_element(numbersWithCost.begin(), numbersWithCost.end(), [](auto& a, auto& b) {
+        return a.cost < b.cost;
+    });
+    auto minCost = minCostIter->cost;
+    auto maxCost = maxCostIter->cost;
+    auto costIncrement = (maxCost - minCost) / 100.0;
+
+    double skipChance = 0.50;
+    int tryCount = 100;
+    double bestTotalCost = std::numeric_limits<double>::max();
+
     std::vector<NumberWithCost> result;
-    std::size_t i = 0;
-    while (primes.size() > 0 && i < numbersWithCost.size()) {
-        if (contains(primes, numbersWithCost[i].factors)) {
-            subtract(primes, numbersWithCost[i].factors);
-            result.emplace_back(numbersWithCost[i]);
+    for (int j = 0; j < tryCount; ++j) {
+        auto primesCopy = primes;
+        auto numbersWithCostCopy = numbersWithCost;
+        std::vector<NumberWithCost> potentialResult;
+        for (auto costThreshold = minCost; costThreshold < maxCost; costThreshold += costIncrement) {
+            bool found = false;
+            do {
+                found = false;
+                for (int i = 0; i < numbersWithCostCopy.size(); ++i) {
+                    if (numbersWithCostCopy[i].cost <= costThreshold && random() > skipChance) {
+                        subtract(primesCopy, numbersWithCostCopy[i].factors);
+                        potentialResult.emplace_back(convertToNumberWithCost(numbersWithCostCopy[i]));
+                        bosKleinjungUpdate(numbersWithCostCopy, primeRatios, primesCopy);
+                        found = true;
+                        break;
+                    }
+                }
+            } while (found);
         }
-        ++i;
-    }
-    if (primes.size() > 0) {
-        uint64_t remainingPrimesProduct = 1;
-        for (auto& prime : primes) {
-            remainingPrimesProduct *= prime;
+        if (primesCopy.size() > 0) {
+            uint64_t remainingPrimesProduct = 1;
+            for (auto& prime : primesCopy) {
+                remainingPrimesProduct *= prime;
+            }
+            potentialResult.push_back(createNumberWithCost(remainingPrimesProduct, B1, costFunction));
         }
-        result.push_back(createNumberWithCost(remainingPrimesProduct, B1, costFunction));
+        potentialResult.push_back(createNumberWithCost(1 << (sizeInBits(B1) - 1), B1, costFunction));
+
+        if (totalCost(potentialResult, evalFunction) < bestTotalCost) {
+            result = potentialResult;
+            bestTotalCost = totalCost(potentialResult, evalFunction);
+        }
     }
-    result.push_back(createNumberWithCost(1 << (sizeInBits(B1) - 1), B1, costFunction));
 
     return result;
+}
+
+std::vector<NumberWithCost> bosKleinjung(std::function<double(uint64_t)> costFunction) {
+    return bosKleinjung(costFunction, costFunction);
 }
