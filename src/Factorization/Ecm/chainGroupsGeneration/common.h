@@ -70,6 +70,9 @@ void printPartition(const std::vector<NumberWithCost>& numbers) {
 }
 
 bool contains(const std::vector<uint64_t>& primes, const std::vector<uint64_t>& factors) {
+    if (primes.size() == 0) {
+        return false;
+    }
     std::size_t i = 0;
     std::size_t j = 0;
     for (;;) {
