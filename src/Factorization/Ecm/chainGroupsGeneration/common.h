@@ -44,17 +44,29 @@ std::function<double(uint64_t)> costDividedBySize(std::function<double(uint64_t)
         return costFunction(n) / sizeInBits(n);
     };
 }
+double totalCost(const std::vector<NumberWithCost>& numbers, std::function<double(uint64_t)> costFunction) {
+    double result = 0;
+    for (auto& n : numbers) {
+        result += costFunction(n.number);
+    }
+    return result;
+}
+double totalCost(const std::vector<NumberWithCost>& numbers) {
+    double result = 0;
+    for (auto& n : numbers) {
+        result += n.cost;
+    }
+    return result;
+}
 
 void printPartition(const std::vector<NumberWithCost>& numbers) {
     writeln("results:");
-    double totalCost = 0;
     for (auto& n : numbers) {
         std::cout << std::setw(20) << n.number << " ";
         std::cout << std::setw(50) << toString(n.factors) << " ";
         std::cout << std::endl;
-        totalCost += n.cost;
     }
-    writeln("totalCost = ", totalCost);
+    writeln("totalCost = ", totalCost(numbers));
 }
 
 bool contains(const std::vector<uint64_t>& primes, const std::vector<uint64_t>& factors) {
