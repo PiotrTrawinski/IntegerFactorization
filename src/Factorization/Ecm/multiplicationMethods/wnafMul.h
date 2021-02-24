@@ -10,11 +10,25 @@
 #include <algorithm>
 
 template<typename T, int N> struct StackVector {
+    StackVector() {}
+    StackVector(const std::vector<T>& vec) {
+        for (auto& v : vec) {
+            emplace_back(v);
+        }
+    }
+    void resize(int size, const T& value) {
+        for (int i = 0; i < size; ++i) {
+            emplace_back(value);
+        }
+    }
+
     int size() const { return size_; }
     T& operator[](int i) { return data[i]; }
     const T& operator[](int i) const { return data[i]; }
     auto begin() { return data.begin(); }
     auto end() { return data.begin() + size(); }
+    auto begin() const { return data.begin(); }
+    auto end() const { return data.begin() + size(); }
     void erase(int index) { 
         std::rotate(begin() + index, begin() + index + 1, end()); 
         size_ -= 1;
@@ -100,6 +114,10 @@ template<template<typename, typename> typename CurveType, typename Type, typenam
         (w == 4) ? wnaf<4>(n) :
         (w == 5) ? wnaf<5>(n) :
                    wnaf<6>(n);
+    if (nafForm.size() == 1) {
+        nafMul(context, curve, p, n);
+        return;
+    }
     int tableSize = (absoluteMaxNaf(nafForm) + 1) / 2;
     std::array<CurvePoint<Type>, 1 << 4> q; // NOTE: will fail to work for wNAF with w > 6!
     q[0] = p;
@@ -165,5 +183,69 @@ template<typename Type, typename ModType> void dnafMul(EcmContext& context, Elli
         nafMul(context, curve, p, n);
     } else {
         wnafMul(bestWNaf, context, curve, p, n);
+    }
+}
+
+
+#include "../bytecode.h"
+void nafMul(bytecode::Writer& bc, uint64_t n) {
+    bc.dbChainSTART();
+    auto nafForm = wnaf<2>(n);
+    for (int i = nafForm.size() - 2; i >= 0; --i) {
+        bc.dbChainDBL();
+        if (nafForm[i] == 1) {
+            bc.dbChainADD(0);
+        } else if (nafForm[i] == -1) {
+            bc.dbChainSUB(0);
+        }
+    }
+    bc.dbChainEND();
+}
+
+void wNafMul(bytecode::Writer& bc, uint64_t n, int w) {
+    debugAssert(w == 3 || w == 4 || w == 5 || w == 6);
+    auto nafForm =
+        (w == 3) ? wnaf<3>(n) :
+        (w == 4) ? wnaf<4>(n) :
+        (w == 5) ? wnaf<5>(n) :
+        wnaf<6>(n);
+    if (nafForm.size() == 1) {
+        nafMul(bc, n);
+        return;
+    }
+    int tableSize = (absoluteMaxNaf(nafForm) + 1) / 2;
+
+    bc.dbChainSTART(tableSize, (nafForm[nafForm.size() - 1] - 1) / 2);
+    int start = nafForm.size() - 2;
+    if (nafForm[nafForm.size() - 1] == 1 && tableSize != 1) {
+        start -= 1;
+    }
+    for (int i = start; i >= 0; --i) {
+        bc.dbChainDBL();
+        if (nafForm[i] > 0) {
+            bc.dbChainADD((nafForm[i] - 1) / 2);
+        } else if (nafForm[i] < 0) {
+            bc.dbChainSUB((-nafForm[i] - 1) / 2);
+        }
+    }
+    bc.dbChainEND();
+}
+
+void dNafMul(bytecode::Writer& bc, uint64_t n, EllipticCurveForm curveForm) {
+    int bestWNaf = 0;
+    if (curveForm == EllipticCurveForm::TwistedEdwards) {
+        auto [bestW, nafForm] = getBestWNaf(n, [](auto& a) { return nafCost(a, 8, 8, 8, 8); });
+        bestWNaf = bestW;
+    } else if (curveForm == EllipticCurveForm::ShortWeierstrass) {
+        auto [bestW, nafForm] = getBestWNaf(n, [](auto& a) { return nafCost(a, 12, 14, 12, 14); });
+        bestWNaf = bestW;
+    } else {
+        debugAssert(false, "Unknown curve type");
+    }
+    
+    if (bestWNaf == 2) {
+        nafMul(bc, n);
+    } else {
+        wNafMul(bc, n, bestWNaf);
     }
 }

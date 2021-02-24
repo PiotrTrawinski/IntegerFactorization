@@ -190,3 +190,73 @@ template<template<typename, typename> typename CurveType, typename Type, typenam
     diffAdd(curve, A, A, B, C);
     debugAssert(d == 1);
 }
+
+
+void pracMul(bytecode::Writer& bc, uint64_t n, int maxChainsToCheck) {
+    constexpr auto NV = 10;
+    static double val[NV] = { 
+        0.61803398874989485, 0.72360679774997897, 0.58017872829546410,
+        0.63283980608870629, 0.61242994950949500, 0.62018198080741576,
+        0.61721461653440386, 0.61834711965622806, 0.61791440652881789,
+        0.61807966846989581 
+    };
+
+    auto nv = std::min<uint64_t>(NV, maxChainsToCheck);
+    uint64_t i = 0;
+    if (nv > 1) {
+        double cmin = MontgomeryAddCost * (double)n;
+        for (uint64_t d = 0; d < nv; d++) {
+            double c = lucasCost(n, val[d]);
+            if (c < cmin) {
+                cmin = c;
+                i = d;
+            }
+        }
+    }
+
+    bc.pracSTART();
+    auto r = (uint64_t)((double)n * val[i] + 0.5);
+    auto d = n - r;
+    auto e = 2 * r - n;
+    while (d != e) {
+        bool isSwap = false;
+        if (d < e) {
+            r = d;
+            d = e;
+            e = r;
+            isSwap = true;
+        }
+        if (d - e <= e / 4 && ((d + e) % 3) == 0) {
+            d = (2 * d - e) / 3;
+            e = (e - d) / 2;
+            bc.pracRule(1, isSwap);
+        } else if (d - e <= e / 4 && (d - e) % 6 == 0) { 
+            d = (d - e) / 2;
+            bc.pracRule(2, isSwap);
+        } else if ((d + 3) / 4 <= e) {
+            d -= e;
+            bc.pracRule(3, isSwap);
+        } else if ((d + e) % 2 == 0) {
+            d = (d - e) / 2;
+            bc.pracRule(4, isSwap);
+        } else if (d % 2 == 0) {
+            d /= 2;
+            bc.pracRule(5, isSwap);
+        } else if (d % 3 == 0) {
+            d = d / 3 - e;
+            bc.pracRule(6, isSwap);
+        } else if ((d + e) % 3 == 0) {
+            d = (d - 2 * e) / 3;
+            bc.pracRule(7, isSwap);
+        } else if ((d - e) % 3 == 0) {
+            d = (d - e) / 3;
+            bc.pracRule(8, isSwap);
+        } else { 
+            e /= 2;
+            bc.pracRule(9, isSwap);
+        }
+    }
+    //debugAssert(d == 1);
+    bc.pracEND();
+}
+

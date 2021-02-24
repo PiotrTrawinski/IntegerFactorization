@@ -27,12 +27,13 @@ template<typename CurveType> typename CurveType::ValueType ecm_(EcmContext& cont
         context.initialCurveSeed = curve.defaultSeed();
     }
     CurvePoint<T> point = curve.initializeCurveAndPoint(context.initialCurveSeed);
+    auto [stage1Bytecode, i] = createBytecode(context, curve.form, curve.mod);
 
     for (std::size_t j = 0; j < context.curveCount; ++j) {
         context.out_curveDoneCount += 1;
 
         // Stage 1
-        int i = ecmStage1Mul(context, curve, point);
+        runBytecode(stage1Bytecode, curve, point);
         if (point.z != zero) {
             gcd(factor, point.z, curve.mod);
         }

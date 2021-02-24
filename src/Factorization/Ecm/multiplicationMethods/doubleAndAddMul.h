@@ -31,3 +31,15 @@ template<template<typename,typename> typename CurveType, typename Type, typename
         }
     }
 }
+
+#include "../bytecode.h"
+void doubleAndAddMul(bytecode::Writer& bc, uint64_t n) {
+    bc.nafSTART();
+    for (auto i = mostSignificantBit(n) >> 1; i > 0; i >>= 1) {
+        bc.nafDBL();
+        if (n & i) {
+            bc.nafADD(0);
+        }
+    }
+    bc.nafEND();
+}
