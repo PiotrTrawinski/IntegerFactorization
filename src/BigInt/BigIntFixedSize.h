@@ -255,6 +255,10 @@ template<int Size> BigIntFixedSize<Size> getValueInMontgomeryForm(const BigIntFi
 template<int Size> void mod(BigIntFixedSize<Size>& r, const BigIntFixedSize<2*Size>& a, const MontgomeryReductionMod<BigIntFixedSize<Size>>& m) {
     bigIntKernels::montgomeryReduction<Size>(r.ptr(), a.ptr(), m.k.ptr(), m.mod.ptr(), m.b);
 }
+template<int Size> void mod(BigIntFixedSize<Size>& r, const BigIntFixedSize<Size>& a, const MontgomeryReductionMod<BigIntFixedSize<Size>>& m) {
+    BigIntFixedSize<2 * Size> aa = a;
+    bigIntKernels::montgomeryReduction<Size>(r.ptr(), aa.ptr(), m.k.ptr(), m.mod.ptr(), m.b);
+}
 template<int Size> void modAdd(BigIntFixedSize<Size>& r, const BigIntFixedSize<Size>& a, const BigIntFixedSize<Size>& b, const MontgomeryReductionMod<BigIntFixedSize<Size>>& m) {
     modAdd(r, a, b, m.mod);
 }
