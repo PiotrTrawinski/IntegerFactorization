@@ -7,7 +7,7 @@
 enum class EllipticCurveForm {
     ShortWeierstrass,
     TwistedEdwards,
-    Montgomery
+    Montgomery,
 };
 
 template<typename ValType, typename ModType = ValType> struct EllipticCurve {
@@ -15,13 +15,17 @@ template<typename ValType, typename ModType = ValType> struct EllipticCurve {
 
     EllipticCurveForm form;
     ModType mod;
-    std::array<ValType, 8> tmp;
+    std::array<ValType, 9> tmp;
 
-    // ShortWeierstrass
+    // ShortWeierstrass and TwistedHessian
     ValType a;
 
     // TwistedEdwards
     uint64_t k;
+
+    // TwistedHessian
+    ValType d;
+    ValType dinv;
 
     // MontgomeryXY
     ValType a24;
@@ -33,7 +37,7 @@ template<typename ValType, typename ModType = ValType> struct EllipticCurve {
         switch (form) {
         case EllipticCurveForm::ShortWeierstrass: return 2;
         case EllipticCurveForm::TwistedEdwards:   return 2;
-        case EllipticCurveForm::Montgomery:     return 6;
+        case EllipticCurveForm::Montgomery:       return 6;
         }
     }
     CurvePoint<ValType> initializeCurveAndPoint(uint64_t seed) {
