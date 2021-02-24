@@ -63,7 +63,7 @@ double lucasCost(uint64_t n, double v) {
     return c;
 }
 
-template<template<typename, typename> typename CurveType, typename Type, typename ModType> void prac(EcmContext& context, CurveType<Type, ModType>& curve, CurvePoint<Type>& p, uint64_t k) {
+template<typename Type, typename ModType> void prac(EcmContext& context, EllipticCurve<Type, ModType>& curve, CurvePoint<Type>& p, uint64_t k) {
     constexpr auto NV = 10;
     auto& tmp = curve.tmp[0];
 

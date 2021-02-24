@@ -4,7 +4,7 @@
 #include "../curves/common.h"
 #include "../../../Utility/bitManipulation.h"
 
-template<template<typename,typename> typename CurveType, typename Type, typename ModType> void doubleAndAddMul(EcmContext& context, CurveType<Type, ModType>& curve, CurvePoint<Type>& p, uint64_t n) {
+template<typename Type, typename ModType> void doubleAndAddMul(EcmContext& context, EllipticCurve<Type, ModType>& curve, CurvePoint<Type>& p, uint64_t n) {
     if (n == 0) { p = curve.zero(); return; }
     if (n == 1) return;
     
@@ -18,7 +18,7 @@ template<template<typename,typename> typename CurveType, typename Type, typename
         }
     }
 }
-template<template<typename,typename> typename CurveType, typename Type, typename ModType, typename T> void doubleAndAddMulX(EcmContext& context, CurveType<Type, ModType>& curve, CurvePoint<Type>& p, const T& n) {
+template<typename Type, typename ModType, typename T> void doubleAndAddMulX(EcmContext& context, EllipticCurve<Type, ModType>& curve, CurvePoint<Type>& p, const T& n) {
     if (isZero(n)) { p = curve.zero(); return; }
 
     CurvePoint<Type> q = p;

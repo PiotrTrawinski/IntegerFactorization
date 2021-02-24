@@ -10,13 +10,13 @@
 #include <cmath>
 #include <vector>
 
-template<template<typename,typename> typename CurveType, typename Type, typename ModType> void mul(CurveType<Type,ModType>& curve, CurvePoint<Type>& p, uint64_t n) {
+template<typename Type, typename ModType> void mul(EllipticCurve<Type, ModType>& curve, CurvePoint<Type>& p, uint64_t n) {
     EcmContext context;
     doubleAndAddMul(context, curve, p, n);
 }
 
-template<typename CurveType> typename CurveType::ValueType ecm_(EcmContext& context, CurveType& curve) {
-    using T = typename CurveType::ValueType;
+template<typename ValueType, typename ModType> ValueType ecm_(EcmContext& context, EllipticCurve<ValueType, ModType>& curve) {
+    using T = ValueType;
 
     T factor = T{ 1 };
     T zero = T{ 0 };
@@ -91,14 +91,14 @@ template<typename CurveType> typename CurveType::ValueType ecm_(EcmContext& cont
     return factor;
 }
 
-template<template<typename,typename> typename CurveType, typename ModType> BigIntValueType<ModType> ecm(EcmContext& context, const ModType& mod) {
-    CurveType<BigIntValueType<ModType>, ModType> curve;
+template<typename ModType> BigIntValueType<ModType> ecm(EcmContext& context, const ModType& mod) {
+    EllipticCurve<BigIntValueType<ModType>, ModType> curve;
     curve.mod = mod;
     return ecm_(context, curve);
 }
 
-template<template<typename, typename> typename CurveType> BigInt ecm(EcmContext& context, const BigInt& n) {
-    return n.visit([&context](auto&& a) { return BigInt{ ecm<CurveType>(context, a) }; });
+template<typename ValueType, typename ModType> BigInt ecm(EcmContext& context, const BigInt& n) {
+    return n.visit([&context](auto&& a) { return BigInt{ ecm<ModType>(context, a) }; });
 }
 
 template<typename ModType> BigIntValueType<ModType> ecm(EcmContext& context, EllipticCurveForm form, const ModType& mod) {

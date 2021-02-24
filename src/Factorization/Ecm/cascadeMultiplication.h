@@ -9,8 +9,8 @@
 #include "multiplicationMethods/pracMul.h"
 #include "bytecode.h"
 
-template<template<typename, typename> typename CurveType, typename Type, typename ModType>
-void cascadeMulDoMultiplication(EcmContext& context, CurveType<Type, ModType>& curve, CurvePoint<Type>& p, uint64_t n) {
+template<typename Type, typename ModType>
+void cascadeMulDoMultiplication(EcmContext& context, EllipticCurve<Type, ModType>& curve, CurvePoint<Type>& p, uint64_t n) {
     switch (context.mulMethod) {
     case EcmMulMethod::DoubleAndAdd: doubleAndAddMul(context, curve, p, n); break;
     case EcmMulMethod::Naf:          nafMul(context, curve, p, n);          break;
@@ -20,8 +20,8 @@ void cascadeMulDoMultiplication(EcmContext& context, CurveType<Type, ModType>& c
     case EcmMulMethod::Prac:         prac(context, curve, p, n);            break;
     }
 }
-template<template<typename, typename> typename CurveType, typename Type, typename ModType, typename T>
-void cascadeMulDoMultiplication(EcmContext& context, CurveType<Type, ModType>& curve, CurvePoint<Type>& p, const T& n) {
+template<typename Type, typename ModType, typename T>
+void cascadeMulDoMultiplication(EcmContext& context, EllipticCurve<Type, ModType>& curve, CurvePoint<Type>& p, const T& n) {
     switch (context.mulMethod) {
     case EcmMulMethod::DoubleAndAdd: doubleAndAddMulX(context, curve, p, n); break;
     case EcmMulMethod::Naf:          debugAssert(false);      break;
@@ -32,8 +32,8 @@ void cascadeMulDoMultiplication(EcmContext& context, CurveType<Type, ModType>& c
     }
 }
 
-template<template<typename, typename> typename CurveType, typename Type, typename ModType> 
-int ecmStage1Mul(EcmContext& context, CurveType<Type, ModType>& curve, CurvePoint<Type>& point) {
+template<typename Type, typename ModType> 
+int ecmStage1Mul(EcmContext& context, EllipticCurve<Type, ModType>& curve, CurvePoint<Type>& point) {
     int i = 0;
     if (context.mulMethod == EcmMulMethod::Prac) {
         // prac requires multiplicands > 2

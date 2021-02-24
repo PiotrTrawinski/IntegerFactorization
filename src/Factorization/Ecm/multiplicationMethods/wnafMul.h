@@ -86,7 +86,7 @@ int nafCost(const StackVector<int8_t, 64>& naf, int dblCost, int addCost, int in
     return (intermediateDblCost * (dblCount - addCount) + dblCost * addCount) + (intermediateAddCost * (addCount - 1) + addCost);
 }
 
-template<template<typename, typename> typename CurveType, typename Type, typename ModType> void nafMul(EcmContext& context, CurveType<Type, ModType>& curve, CurvePoint<Type>& p, uint64_t n) {
+template<typename Type, typename ModType> void nafMul(EcmContext& context, EllipticCurve<Type, ModType>& curve, CurvePoint<Type>& p, uint64_t n) {
     if (n == 0) { p = curve.zero(); return; }
     if (n == 1) return;
 
@@ -104,7 +104,7 @@ template<template<typename, typename> typename CurveType, typename Type, typenam
         }
     }
 }
-template<template<typename, typename> typename CurveType, typename Type, typename ModType> void wnafMul(int w, EcmContext& context, CurveType<Type, ModType>& curve, CurvePoint<Type>& p, uint64_t n) {
+template<typename Type, typename ModType> void wnafMul(int w, EcmContext& context, EllipticCurve<Type, ModType>& curve, CurvePoint<Type>& p, uint64_t n) {
     if (n == 0) { p = curve.zero(); return; }
     if (n == 1) return;
 
