@@ -46,11 +46,11 @@ template<int64_t w=2> StackVector<int8_t, 64> wnaf(int64_t e) {
     StackVector<int8_t, 64> z;
     while (e > 0) {
         if (e % 2 == 1) {
-            auto zi = e % (1 << w);
+            int8_t zi = e % (1 << w);
             if (w > 1 && zi >= (1 << (w - 1))) {
                 zi -= (1 << w);
             }
-            z.emplace_back((int8_t)zi);
+            z.emplace_back(zi);
             e -= zi;
         } else {
             z.emplace_back(0);
@@ -64,7 +64,58 @@ template<int64_t w=2> StackVector<int8_t, 64> wnaf(int64_t e) {
     }
     return z;
 }
-int absoluteMaxNaf(const StackVector<int8_t, 64>& naf) {
+template<int64_t w, int S> StackVector<int8_t, 64*S> wnaf(BigIntFixedSize<S> e) {
+    StackVector<int8_t, 64*S> z;
+    while (e > 0) {
+        if (e[0] & 1) {
+            int8_t zi = e[0] & ((1 << w) - 1);
+            if (w > 1 && zi >= (1 << (w - 1))) {
+                zi -= (1 << w);
+            }
+            z.emplace_back(zi);
+            e -= zi;
+        } else {
+            z.emplace_back(0);
+        }
+        e = e >> 1;
+    }
+    if (z.size() >= 3 && z[z.size() - 3] == -1) {
+        z[z.size() - 3] = 1;
+        z[z.size() - 2] = 1;
+        z.size_ -= 1;
+    }
+    return z;
+}
+template<int64_t w> std::vector<int8_t> wnaf(BigIntGmp e) {
+    std::vector<int8_t> z;
+    while (e > 0) {
+        if (e[0] & 1) {
+            int8_t zi = e[0] & ((1 << w) - 1);
+            if (w > 1 && zi >= (1 << (w - 1))) {
+                zi -= (1 << w);
+            }
+            z.emplace_back(zi);
+            sub(e, e, zi);
+        } else {
+            z.emplace_back(0);
+        }
+        shr(e, e, 1);
+    }
+    if (z.size() >= 3 && z[z.size() - 3] == -1) {
+        z[z.size() - 3] = 1;
+        z[z.size() - 2] = 1;
+        z.erase(z.end() - 1);
+    }
+    return z;
+}
+template<int Size> int absoluteMaxNaf(const StackVector<int8_t, Size>& naf) {
+    int max = 1;
+    for (int i = 0; i < naf.size(); ++i) {
+        max = std::max(max, std::abs(naf[i]));
+    }
+    return max;
+}
+int absoluteMaxNaf(const std::vector<int8_t>& naf) {
     int max = 1;
     for (int i = 0; i < naf.size(); ++i) {
         max = std::max(max, std::abs(naf[i]));
@@ -81,7 +132,21 @@ std::pair<int, int> nafDblAddCounts(const StackVector<int8_t, 64>& naf) {
     }
     return { dblCount, addCount };
 }
+std::pair<int, int> nafDblAddCounts(const std::vector<int8_t>& naf) {
+    int dblCount = (naf[naf.size() - 1] != 1) + naf.size() - 1;
+    int addCount = (absoluteMaxNaf(naf) + 1) / 2 - 1;
+    for (int i = 0; i < naf.size() - 1; ++i) {
+        if (naf[i] != 0) {
+            addCount += 1;
+        }
+    }
+    return { dblCount, addCount };
+}
 int nafCost(const StackVector<int8_t, 64>& naf, int dblCost, int addCost, int intermediateDblCost, int intermediateAddCost) {
+    auto [dblCount, addCount] = nafDblAddCounts(naf);
+    return (intermediateDblCost * (dblCount - addCount) + dblCost * addCount) + (intermediateAddCost * (addCount - 1) + addCost);
+}
+int nafCost(const std::vector<int8_t>& naf, int dblCost, int addCost, int intermediateDblCost, int intermediateAddCost) {
     auto [dblCount, addCount] = nafDblAddCounts(naf);
     return (intermediateDblCost * (dblCount - addCount) + dblCost * addCount) + (intermediateAddCost * (addCount - 1) + addCost);
 }
@@ -164,6 +229,25 @@ template<typename CostFunction> std::pair<int, StackVector<int8_t, 64>> getBestW
     int bestWNaf = std::get<0>(bestNafForm);
     return { bestWNaf, std::get<1>(bestNafForm) };
 }
+template<typename T, typename CostFunction> std::pair<int, std::vector<int8_t>> getBestWNaf(const T& n, CostFunction costFunction) {
+    std::array<std::tuple<int, std::vector<int8_t>, double>, 5> nafForms = {
+        std::tuple<int, std::vector<int8_t>, double>{ 2, wnaf<2>(n), 0 },
+        std::tuple<int, std::vector<int8_t>, double>{ 3, wnaf<3>(n), 0 },
+        std::tuple<int, std::vector<int8_t>, double>{ 4, wnaf<4>(n), 0 },
+        std::tuple<int, std::vector<int8_t>, double>{ 5, wnaf<5>(n), 0 },
+        std::tuple<int, std::vector<int8_t>, double>{ 6, wnaf<6>(n), 0 }
+    };
+    for (auto& nafForm : nafForms) {
+        std::get<2>(nafForm) = costFunction(std::get<1>(nafForm));
+    }
+    std::stable_sort(nafForms.begin(), nafForms.end(), [](auto& a, auto& b) {
+        return std::get<2>(a) < std::get<2>(b);
+    });
+    auto& bestNafForm = nafForms[0];
+    int bestWNaf = std::get<0>(bestNafForm);
+    return { bestWNaf, std::get<1>(bestNafForm) };
+}
+
 template<typename Type, typename ModType> void dnafMul(EcmContext& context, EllipticCurve<Type, ModType>& curve, CurvePoint<Type>& p, uint64_t n) {
     if (n == 0) { p = curve.zero(); return; }
     if (n == 1) return;
@@ -188,7 +272,7 @@ template<typename Type, typename ModType> void dnafMul(EcmContext& context, Elli
 
 
 #include "../bytecode.h"
-void nafMul(bytecode::Writer& bc, uint64_t n) {
+template<typename T> void nafMul(bytecode::Writer& bc, const T& n) {
     bc.dbChainSTART();
     auto nafForm = wnaf<2>(n);
     for (int i = nafForm.size() - 2; i >= 0; --i) {
@@ -202,7 +286,7 @@ void nafMul(bytecode::Writer& bc, uint64_t n) {
     bc.dbChainEND();
 }
 
-void wNafMul(bytecode::Writer& bc, uint64_t n, int w) {
+template<typename T> void wNafMul(bytecode::Writer& bc, const T& n, int w) {
     debugAssert(w == 3 || w == 4 || w == 5 || w == 6);
     auto nafForm =
         (w == 3) ? wnaf<3>(n) :
@@ -215,7 +299,7 @@ void wNafMul(bytecode::Writer& bc, uint64_t n, int w) {
     }
     int tableSize = (absoluteMaxNaf(nafForm) + 1) / 2;
 
-    bc.dbChainSTART(tableSize, (nafForm[nafForm.size() - 1] - 1) / 2);
+    bc.dbChainSTART(tableSize-1, (nafForm[nafForm.size() - 1] - 1) / 2);
     int start = nafForm.size() - 2;
     if (nafForm[nafForm.size() - 1] == 1 && tableSize != 1) {
         start -= 1;
@@ -232,6 +316,25 @@ void wNafMul(bytecode::Writer& bc, uint64_t n, int w) {
 }
 
 void dNafMul(bytecode::Writer& bc, uint64_t n, EllipticCurveForm curveForm) {
+    int bestWNaf = 0;
+    if (curveForm == EllipticCurveForm::TwistedEdwards) {
+        auto [bestW, nafForm] = getBestWNaf(n, [](auto& a) { return nafCost(a, 8, 8, 8, 8); });
+        bestWNaf = bestW;
+    } else if (curveForm == EllipticCurveForm::ShortWeierstrass) {
+        auto [bestW, nafForm] = getBestWNaf(n, [](auto& a) { return nafCost(a, 12, 14, 12, 14); });
+        bestWNaf = bestW;
+    } else {
+        debugAssert(false, "Unknown curve type");
+    }
+    
+    if (bestWNaf == 2) {
+        nafMul(bc, n);
+    } else {
+        wNafMul(bc, n, bestWNaf);
+    }
+}
+
+template<typename T> void dNafMul(bytecode::Writer& bc, const T& n, EllipticCurveForm curveForm) {
     int bestWNaf = 0;
     if (curveForm == EllipticCurveForm::TwistedEdwards) {
         auto [bestW, nafForm] = getBestWNaf(n, [](auto& a) { return nafCost(a, 8, 8, 8, 8); });

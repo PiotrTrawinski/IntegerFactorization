@@ -33,6 +33,16 @@ template<typename Type, typename ModType, typename T> void doubleAndAddMulX(EcmC
 }
 
 #include "../bytecode.h"
+template<typename T> void doubleAndAddMul(bytecode::Writer& bc, const T& n) {
+    bc.nafSTART();
+    for (auto i = n.sizeInBits()-1; i > 0; --i) {
+        bc.nafDBL();
+        if (n.bit(i)) {
+            bc.nafADD(0);
+        }
+    }
+    bc.nafEND();
+}
 void doubleAndAddMul(bytecode::Writer& bc, uint64_t n) {
     bc.nafSTART();
     for (auto i = mostSignificantBit(n) >> 1; i > 0; i >>= 1) {
