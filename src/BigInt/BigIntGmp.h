@@ -64,6 +64,13 @@ struct BigIntGmp {
     int capacity() const {
         return data->_mp_alloc;
     }
+
+    BigIntBit bit(int index)                  { return BigIntBit(ptr() + index / 64, index % 64); }
+    const BigIntConstBit bit(int index) const { return BigIntConstBit(ptr() + index / 64, index % 64); }
+    uint32_t sizeInBits() const {
+        auto s = size();
+        return (s - 1) * 64 + static_cast<uint32_t>(::sizeInBits(ptr()[s - 1]));
+    }
 };
 template<> struct BigIntParseImpl<BigIntGmp> {
     static BigIntGmp parse(const std::string& str) {
@@ -202,6 +209,13 @@ void add(BigIntGmp& r, const BigIntGmp& a, const BigIntGmp& b) {
 }
 void sub(BigIntGmp& r, const BigIntGmp& a, const BigIntGmp& b) {
     mpz_sub(r.data, a.data, b.data);
+}
+void sub(BigIntGmp& r, const BigIntGmp& a, int64_t b) {
+    if (b >= 0) {
+        mpz_sub_ui(r.data, a.data, b);
+    } else {
+        mpz_add_ui(r.data, a.data, -b);
+    }
 }
 void absSub(BigIntGmp& r, const BigIntGmp& a, const BigIntGmp& b) {
     sub(r, a, b);
