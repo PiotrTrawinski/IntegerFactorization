@@ -350,6 +350,9 @@ template<int Size> void gcd(BigIntFixedSize<Size>& r, const BigIntFixedSize<Size
 template<int Size> void add(BigIntFixedSize<Size>& r, const BigIntFixedSize<Size>& a, uint64_t b) {
     bigIntKernels::add<Size, Size, 1>(r.ptr(), a.ptr(), &b);
 }
+template<int Size> void sub(BigIntFixedSize<Size>& r, const BigIntFixedSize<Size>& a, uint64_t b) {
+    bigIntKernels::sub<Size, Size, 1>(r.ptr(), a.ptr(), &b);
+}
 template<int Size> void mul(BigIntFixedSize<Size>& r, const BigIntFixedSize<Size>& a, uint64_t b) {
     bigIntKernels::mul<Size, Size, 1>(r.ptr(), a.ptr(), &b);
 }
@@ -435,8 +438,29 @@ template<int S> bool operator>(const BigIntFixedSize<S>& a, int b) {
 template<int S> bool operator<=(const BigIntFixedSize<S>& a, uint64_t b) {
     return bigIntKernels::cmp<S, 1>(a.ptr(), &b) <= 0;
 }
+template<int S> bool operator>=(const BigIntFixedSize<S>& a, uint64_t b) {
+    return bigIntKernels::cmp<S, 1>(a.ptr(), &b) >= 0;
+}
 template<int S> BigIntFixedSize<S>& operator+=(BigIntFixedSize<S>& r, int a) {
     add(r, r, a);
+    return r;
+}
+template<int S> BigIntFixedSize<S>& operator-=(BigIntFixedSize<S>& r, int a) {
+    if (a >= 0) {
+        sub(r, r, a);
+    } else {
+        add(r, r, -a);
+    }
+    return r;
+}
+template<int S> BigIntFixedSize<S>& operator*=(BigIntFixedSize<S>& r, uint64_t a) {
+    mul(r, r, a);
+    return r;
+}
+template<int S1, int S2> BigIntFixedSize<S1>& operator*=(BigIntFixedSize<S1>& r, const BigIntFixedSize<S2>& b) {
+    BigIntFixedSize<S1 + S2> res;
+    mul(res, r, b);
+    r = res;
     return r;
 }
 
