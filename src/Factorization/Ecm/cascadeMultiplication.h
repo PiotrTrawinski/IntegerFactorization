@@ -16,6 +16,8 @@ void cascadeMulDoMultiplication(EcmContext& context, EllipticCurve<Type, ModType
     case EcmMulMethod::Naf:          nafMul(context, curve, p, n);          break;
     case EcmMulMethod::WNaf3:        wnafMul(3, context, curve, p, n);      break;
     case EcmMulMethod::WNaf4:        wnafMul(4, context, curve, p, n);      break;
+    case EcmMulMethod::WNaf5:        wnafMul(5, context, curve, p, n);      break;
+    case EcmMulMethod::WNaf6:        wnafMul(6, context, curve, p, n);      break;
     case EcmMulMethod::DNaf:         dnafMul(context, curve, p, n);         break;
     case EcmMulMethod::Prac:         prac(context, curve, p, n);            break;
     }
@@ -27,6 +29,8 @@ void cascadeMulDoMultiplication(EcmContext& context, EllipticCurve<Type, ModType
     case EcmMulMethod::Naf:          debugAssert(false);      break;
     case EcmMulMethod::WNaf3:        debugAssert(false);      break;
     case EcmMulMethod::WNaf4:        debugAssert(false);      break;
+    case EcmMulMethod::WNaf5:        debugAssert(false);      break;
+    case EcmMulMethod::WNaf6:        debugAssert(false);      break;
     case EcmMulMethod::DNaf:         debugAssert(false);      break;
     case EcmMulMethod::Prac:         debugAssert(false);      break;
     }
@@ -101,85 +105,143 @@ int ecmStage1Mul(EcmContext& context, EllipticCurve<Type, ModType>& curve, Curve
 }
 
 
-template<typename ModType> void addBytecode(bytecode::Writer& bc, const EcmContext& context, EllipticCurveForm curveForm, const ModType& modValue, uint64_t n) {
-    switch (context.mulMethod) {
+void addBytecode(bytecode::Writer& bc, EcmMulMethod mulMethod, EllipticCurveForm curveForm, int pracChainsToCheck, uint64_t n) {
+    switch (mulMethod) {
     case EcmMulMethod::DoubleAndAdd: doubleAndAddMul(bc, n);                break;
     case EcmMulMethod::Naf:          nafMul(bc, n);                         break;
     case EcmMulMethod::WNaf3:        wNafMul(bc, n, 3);                     break;
     case EcmMulMethod::WNaf4:        wNafMul(bc, n, 4);                     break;
+    case EcmMulMethod::WNaf5:        wNafMul(bc, n, 5);                     break;
+    case EcmMulMethod::WNaf6:        wNafMul(bc, n, 6);                     break;
     case EcmMulMethod::DNaf:         dNafMul(bc, n, curveForm);             break;
-    case EcmMulMethod::Prac:         pracMul(bc, n, sizeInLimbs(modValue)); break;
+    case EcmMulMethod::Prac:         pracMul(bc, n, pracChainsToCheck);     break;
     }
 }
-template<typename ModType> std::pair<std::vector<uint8_t>, int> createBytecode(const EcmContext& context, EllipticCurveForm curveForm, const ModType& modValue) {
-    bytecode::Writer bc;
-    int i = 0;
+template<typename ValueType> void addBytecode(bytecode::Writer& bc, EcmMulMethod mulMethod, EllipticCurveForm curveForm, int pracChainsToCheck, const ValueType& n) {
+    switch (mulMethod) {
+    case EcmMulMethod::DoubleAndAdd: doubleAndAddMul(bc, n);                break;
+    case EcmMulMethod::Naf:          nafMul(bc, n);                         break;
+    case EcmMulMethod::WNaf3:        wNafMul(bc, n, 3);                     break;
+    case EcmMulMethod::WNaf4:        wNafMul(bc, n, 4);                     break;
+    case EcmMulMethod::WNaf5:        wNafMul(bc, n, 5);                     break;
+    case EcmMulMethod::WNaf6:        wNafMul(bc, n, 6);                     break;
+    case EcmMulMethod::DNaf:
+        if constexpr (std::is_same_v<ValueType, BigIntGmp>)
+            dNafMul(bc, n, curveForm);
+        else
+            debugAssert(false);
+        break;
+    break;
+    case EcmMulMethod::Prac:         debugAssert(false);                    break;
+    }
+}
 
-    if (context.mulMethod == EcmMulMethod::Prac) {
+static auto DnafFullBytecodes = bytecode::readFromFile("dnaf_bytecode");
+static auto nafKleinjungBytecodes = bytecode::readFromFile("bosKleinjungNaf_bytecode");
+template<typename ModType> std::pair<std::vector<uint8_t>, int> createBytecode(const EcmContext& context, EllipticCurveForm curveForm, const ModType& modValue) {
+    if (context.mulMethod == EcmMulMethod::DNaf && context.mulCascadeMethod == EcmMulCascadeMethod::Full && context.B1 <= 10000 && context.B1 % 10 == 0) {
+        return { DnafFullBytecodes[context.B1].buffer, 0 }; // TODO: change 0 to correct value
+    }
+    if (context.mulMethod == EcmMulMethod::Naf && context.B1 < 1000 && context.B1 % 100 == 0) {
+        return { nafKleinjungBytecodes[context.B1].buffer, 0 }; // TODO: change 0 to correct value
+    }
+    
+    bytecode::Writer bc;
+    auto i = createBytecode(bc, context.B1, context.mulMethod, context.mulCascadeMethod, curveForm, sizeInLimbs(modValue));
+    std::vector<uint8_t> data(bc.buffer.data.begin()+48, bc.buffer.data.end());
+    return { data, i };
+}
+int createBytecode(bytecode::Writer& bc, uint64_t B1, EcmMulMethod mulMethod, EcmMulCascadeMethod cascadeMethod, EllipticCurveForm curveForm, int pracChainsToCheck=10) {
+    bc.START(B1);
+    int i = 0;
+    //BigIntFixedSize<4> test = 1;
+
+    if (mulMethod == EcmMulMethod::Prac) {
         // prac requires multiplicands > 2
         bc.dbChainSTART(0, 0);
-        for (uint64_t r = 2; r <= context.B1; r *= 2) {
+        for (uint64_t r = 2; r <= B1; r *= 2) {
             bc.dbChainDBL();
         }
         bc.dbChainEND();
         i = 2;
     } 
-    if (context.mulCascadeMethod == EcmMulCascadeMethod::Seperate) {
-        for (; Primes_1_000_000[i] <= context.B1; ++i) {
-            for (uint64_t p = Primes_1_000_000[i]; p <= context.B1; p *= Primes_1_000_000[i]) {
-                addBytecode(bc, context, curveForm, modValue, (uint64_t)Primes_1_000_000[i]);
+    if (cascadeMethod == EcmMulCascadeMethod::Seperate) {
+        for (; Primes_1_000_000[i] <= B1; ++i) {
+            for (uint64_t p = Primes_1_000_000[i]; p <= B1; p *= Primes_1_000_000[i]) {
+                addBytecode(bc, mulMethod, curveForm, pracChainsToCheck, (uint64_t)Primes_1_000_000[i]);
+                //test *= Primes_1_000_000[i];
             }
         }
     } 
-    else if (context.mulCascadeMethod == EcmMulCascadeMethod::Powers) {
-        for (; Primes_1_000_000[i] <= context.B1; ++i) {
+    else if (cascadeMethod == EcmMulCascadeMethod::Powers) {
+        for (; Primes_1_000_000[i] <= B1; ++i) {
             uint64_t p = Primes_1_000_000[i];
             uint64_t q;
             do {
                 q = p;
                 p *= Primes_1_000_000[i];
-            } while (p <= context.B1);
-            addBytecode(bc, context, curveForm, modValue, q);
+            } while (p <= B1);
+            addBytecode(bc, mulMethod, curveForm, pracChainsToCheck, q);
+            //test *= q;
         }
     }
-    else if (context.mulCascadeMethod == EcmMulCascadeMethod::MaxUntilOverflow) {
-        uint64_t x = 1;
-        uint64_t y = 1;
-        // TODO: something is wrong here, not the same result as Seperate and Powers method.
-        for (; Primes_1_000_000[i] <= context.B1; ++i) {
+    else if (cascadeMethod == EcmMulCascadeMethod::MaxUntilOverflow) {
+        BigIntFixedSize<2> x = 1;
+        BigIntFixedSize<2> y = 1;
+        BigIntFixedSize<2> limit = 1ull << 63;
+        for (; Primes_1_000_000[i] <= B1; ++i) {
             uint64_t p = Primes_1_000_000[i];
             do {
-                y *= Primes_1_000_000[i];
-                if (x > y || y > (1ull << 63)) {
-                    addBytecode(bc, context, curveForm, modValue, x);
+                //y *= Primes_1_000_000[i];
+                mul(y, y, Primes_1_000_000[i]);
+                if (x > y || y >= limit) {
+                    addBytecode(bc, mulMethod, curveForm, pracChainsToCheck, x);
+                    //test *= x;
                     y = Primes_1_000_000[i];
                 }
                 x = y;
                 p *= Primes_1_000_000[i];
-            } while (p <= context.B1);
+            } while (p <= B1);
         }
-        addBytecode(bc, context, curveForm, modValue, x);
+        addBytecode(bc, mulMethod, curveForm, pracChainsToCheck, x);
+        //test *= x;
     }
-    //else if (context.mulCascadeMethod == EcmMulCascadeMethod::MaxUntil256Overflow) {
-    //    BigIntFixedSize<4> x = 1;
-    //    BigIntFixedSize<4> y = 1;
-    //    BigIntFixedSize<4> limit = MaxU64;
-    //    shl(limit, limit, 190);
-    //    for (; Primes_1_000_000[i] <= context.B1; ++i) {
-    //        uint64_t p = Primes_1_000_000[i];
-    //        do {
-    //            mul(y, y, Primes_1_000_000[i]);
-    //            if (x > y || y > limit) {
-    //                cascadeMulDoMultiplication(context, curve, point, x);
-    //                y = Primes_1_000_000[i];
-    //            }
-    //            x = y;
-    //            p *= Primes_1_000_000[i];
-    //        } while (p <= context.B1);
-    //    }
-    //}
+    else if (cascadeMethod == EcmMulCascadeMethod::MaxUntil256Overflow) {
+        BigIntFixedSize<4> x = 1;
+        BigIntFixedSize<4> y = 1;
+        BigIntFixedSize<4> limit = 1;
+        shl(limit, limit, 255);
+        for (; Primes_1_000_000[i] <= B1; ++i) {
+            uint64_t p = Primes_1_000_000[i];
+            do {
+                mul(y, y, Primes_1_000_000[i]);
+                if (x > y || y >= limit) {
+                    addBytecode(bc, mulMethod, curveForm, pracChainsToCheck, x);
+                    //test *= x;
+                    y = Primes_1_000_000[i];
+                }
+                x = y;
+                p *= Primes_1_000_000[i];
+            } while (p <= B1);
+        }
+        addBytecode(bc, mulMethod, curveForm, pracChainsToCheck, x);
+        //test *= x;
+    }
+    else if (cascadeMethod == EcmMulCascadeMethod::Full) {
+        BigIntGmp x = 1;
+        for (; Primes_1_000_000[i] <= B1; ++i) {
+            uint64_t p = Primes_1_000_000[i];
+            do {
+                mul(x, x, Primes_1_000_000[i]);
+                p *= Primes_1_000_000[i];
+            } while (p <= B1);
+        }
+        addBytecode(bc, mulMethod, curveForm, pracChainsToCheck, x);
+        //test *= x;
+    }
     bc.END();
-    return { bc.buffer.data, i };
+    //writeln(test, '\t', test[0]);
+    return i;
 }
 
 template<typename Type, typename ModType> void runBytecode(const std::vector<uint8_t>& bytes, EllipticCurve<Type, ModType>& curve, CurvePoint<Type>& point) {
@@ -247,9 +309,9 @@ template<typename Type, typename ModType> void runNafBlock(bytecode::Reader& bc,
 template<typename Type, typename ModType> void runDbChainBlock(bytecode::Reader& bc, EllipticCurve<Type, ModType>& curve, CurvePoint<Type>& p, std::array<CurvePoint<Type>, 256>& points) {
     auto initPointCount = bc.peekDataBits();
     points[0] = p;
-    if (initPointCount > 1) {
+    if (initPointCount > 0) {
         dbl(curve, p);
-        for (int i = 1; i < initPointCount; ++i) {
+        for (int i = 1; i <= initPointCount; ++i) {
             points[i] = points[i - 1];
             add(curve, points[i], p);
         }
@@ -262,11 +324,11 @@ template<typename Type, typename ModType> void runDbChainBlock(bytecode::Reader&
     bc.skipByte();
     while (true) {
         auto inst = bc.nextInstruction();
-        for (int i = 0; i < inst.dblCount; ++i) {
-            dbl(curve, p);
-        }
         for (int i = 0; i < inst.tplCount; ++i) {
             tpl(curve, p);
+        }
+        for (int i = 0; i < inst.dblCount; ++i) {
+            dbl(curve, p);
         }
         if (!inst.skipAdd) {
             if (inst.isSub) {

@@ -5,6 +5,8 @@ enum class EcmMulMethod {
     Naf,          // 2NAF aka NAF
     WNaf3,        // 3NAF
     WNaf4,        // 4NAF
+    WNaf5,        // 5NAF
+    WNaf6,        // 6NAF
     DNaf,         // dynamic NAF
     Prac          // Montgomery PRAC algorithm
 };
@@ -13,7 +15,8 @@ enum class EcmMulCascadeMethod {
     Seperate,            // All primes are multiplied seperately                  (example: B1=11 => nP = P*2*2*2*3*3*5*7*11)
     Powers,              // Multiplication done in batches of prime powers        (example: B1=11 => nP = P*8*9*5*7*11)
     MaxUntilOverflow,    // Multiplication done in batches as big as u64 can hold (example: B1=11 => nP = P*27720)
-    MaxUntil256Overflow  // Multiplication done in batches as big as 256-bit can hold
+    MaxUntil256Overflow, // Multiplication done in batches as big as 256-bit can hold
+    Full
 };
 
 struct EcmContext {
