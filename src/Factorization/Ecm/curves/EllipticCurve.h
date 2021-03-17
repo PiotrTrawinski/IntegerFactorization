@@ -4,6 +4,8 @@
 #include "twistedEdwards.h"
 #include "montgomery.h"
 
+TwistedEdwardsParametrization TwistedEdwardsParam = TwistedEdwardsParametrization::Old;
+
 enum class EllipticCurveForm {
     ShortWeierstrass,
     TwistedEdwards,
@@ -15,12 +17,13 @@ template<typename ValType, typename ModType = ValType> struct EllipticCurve {
 
     EllipticCurveForm form;
     ModType mod;
-    std::array<ValType, 9> tmp;
+    std::array<ValType, 17> tmp;
 
     // ShortWeierstrass and TwistedHessian
     ValType a;
 
     // TwistedEdwards
+    ValType a1, a2, a3, a4, s, t, sBase, tBase;
     uint64_t k;
 
     // TwistedHessian
@@ -46,8 +49,13 @@ template<typename ValType, typename ModType = ValType> struct EllipticCurve {
             a = getConstant(seed, mod);
             return CurvePoint<ValType> { getConstant(1, mod), getConstant(2, mod), getConstant(1, mod), 0 };
         case EllipticCurveForm::TwistedEdwards:
-            k = seed;
-            return twistedEdwardsGenerateCurvePoint(*this, k);
+            if (TwistedEdwardsParam != TwistedEdwardsParametrization::Old) {
+                twistedEdwardsInitializeParametrization(TwistedEdwardsParam, *this);
+                return twistedEdwardsGenerateNextCurvePoint(TwistedEdwardsParam, *this);
+            } else {
+                k = seed;
+                return twistedEdwardsGenerateCurvePoint(*this, k);
+            }
         case EllipticCurveForm::Montgomery:
             sigma = getConstant(seed, mod);
             return MontgomeryGenerateCurvePoint(*this, sigma);
@@ -60,8 +68,12 @@ template<typename ValType, typename ModType = ValType> struct EllipticCurve {
             out_point.z = getConstant(1, mod);
             break;
         case EllipticCurveForm::TwistedEdwards:
-            k += 1;
-            out_point = twistedEdwardsGenerateCurvePoint(*this, k);
+            if (TwistedEdwardsParam != TwistedEdwardsParametrization::Old) {
+                out_point = twistedEdwardsGenerateNextCurvePoint(TwistedEdwardsParam, *this);
+            } else {
+                k += 1;
+                out_point = twistedEdwardsGenerateCurvePoint(*this, k);
+            }
             break;
         case EllipticCurveForm::Montgomery:
             add(sigma, sigma, getConstant(1, mod));
