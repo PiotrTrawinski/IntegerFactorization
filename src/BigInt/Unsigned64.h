@@ -25,11 +25,17 @@ void add(uint64_t& r, uint64_t a, uint64_t b) {
 void sub(uint64_t& r, uint64_t a, uint64_t b) {
     r = a - b;
 }
+void shl(uint64_t& r, uint64_t a, int c) {
+    r = a << c;
+}
 void absSub(uint64_t& r, uint64_t a, uint64_t b) {
     if (a > b)
         r = a - b;
     else
         r = b - a;
+}
+void mod(uint64_t& r, uint64_t a, uint64_t m) {
+    r = a % m;
 }
 void modAdd(uint64_t& r, uint64_t a, uint64_t b, uint64_t m) {
     r = a + b;
@@ -55,6 +61,21 @@ void modNeg(uint64_t& r, uint64_t a, uint64_t m) {
 }
 void modDbl(uint64_t& r, uint64_t a, uint64_t m) {
     modAdd(r, a, a, m);
+}
+void modPow(uint64_t& r, uint64_t a, uint64_t e, uint64_t m) {
+    if (m == 1) {
+        r = 0;
+        return;
+    }
+    r = 1;
+    mod(a, a, m);
+    while (e > 0) {
+        if (e % 2 == 1) {
+            modMul(r, r, a, m);
+        }
+        e >>= 1;
+        modSqr(a, a, m);
+    }
 }
 void modInv(int64_t& t, int64_t a, int64_t m) {
     t = 0;

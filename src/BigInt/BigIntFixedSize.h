@@ -343,6 +343,23 @@ template<int Size> void modInv(BigIntFixedSize<Size>& r, const BigIntFixedSize<S
 template<int Size> void modInv(BigIntFixedSize<Size>& r, const BigIntFixedSize<Size>& a, const MontgomeryReductionMod<BigIntFixedSize<Size>>& m) {
     bigIntKernels::modInv<Size>(r.ptr(), a.ptr(), m.mod.ptr()); // TODO: is it ok? probably not
 }
+template<int Size> void modPow(BigIntFixedSize<Size>& r, BigIntFixedSize<Size> a, BigIntFixedSize<Size> e, const MontgomeryReductionMod<BigIntFixedSize<Size>>& m) {
+    r = getConstant(1, m);
+    while (e > 0) {
+        if (e[0] % 2 == 1) {
+            modMul(r, r, a, m);
+        }
+        shr(e, e, 1);
+        modSqr(a, a, m);
+    }
+}
+template<int Size> void modPow(BigIntFixedSize<Size>& r, const BigIntFixedSize<Size>& a, const BigIntFixedSize<Size>& e, const BigIntFixedSize<Size>& m) {
+    auto mont = getMontgomeryReductionMod(m);
+    BigIntFixedSize<Size> aMont;
+    convertToMontgomeryForm(aMont, a, mont);
+    modPow(r, aMont, e, mont);
+    mod(r, r, mont);
+}
 template<int Size> void gcd(BigIntFixedSize<Size>& r, const BigIntFixedSize<Size>& a, const BigIntFixedSize<Size>& b) {
     bigIntKernels::gcd<Size>(r.ptr(), a.ptr(), b.ptr());
 }
