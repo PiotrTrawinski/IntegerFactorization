@@ -4,6 +4,7 @@
 #include <gmp.h>
 #include "common.h"
 #include "../Utility/bitManipulation.h"
+#include "BigIntFixedSize.h"
 
 struct BigIntGmp {
     mpz_t data;
@@ -15,6 +16,10 @@ struct BigIntGmp {
         mpz_set_str(data, str.c_str(), 10);
     }
     BigIntGmp(uint64_t value) : BigIntGmp(std::to_string(value)) {
+    }
+    template<int Size> BigIntGmp(const BigIntFixedSize<Size>& value) {
+        mpz_init2(data, Size * 64);
+        memcpy(ptr(), value.ptr(), Size * sizeof(uint64_t));
     }
     BigIntGmp(const BigIntGmp& other) {
         mpz_init_set(data, other.data);
@@ -500,6 +505,9 @@ BigIntGmp getConstant(uint64_t a, const BarretReductionMod<BigIntGmp>& m) {
 }
 BigIntGmp getConstant(uint64_t a, const MontgomeryReductionMod<BigIntGmp>& m) {
     return getValueInMontgomeryForm(BigIntGmp{ a } % m.mod, m);
+}
+BigIntGmp getConstant(const BigIntGmp& a, const MontgomeryReductionMod<BigIntGmp>& m) {
+    return getValueInMontgomeryForm(a % m.mod, m);
 }
 
 uint32_t mod(const BigIntGmp& a, uint32_t m, [[maybe_unused]] int tableEntryId) {

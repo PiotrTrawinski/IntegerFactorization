@@ -11,6 +11,7 @@
 #include <array>
 #include <algorithm>
 
+struct BigIntGmp;
 
 /*
     Big Integer class with fixed size.
@@ -28,7 +29,10 @@ template<int Size=4> struct BigIntFixedSize {
     BigIntFixedSize(uint64_t value) { data[0] = value; bigIntKernels::clear<Size - 1>(ptr()+1); }
     BigIntFixedSize() : BigIntFixedSize(0) {}
     BigIntFixedSize(const std::string& str) { parseString(str); }
-
+    BigIntFixedSize(const BigIntGmp& other) {
+        debugAssert(Size >= other.sizeInBits());
+        bigIntKernels::copy(ptr(), other.ptr(), Size, other.sizeInBits());
+    }
     template<int OtherSize> BigIntFixedSize(const BigIntFixedSize<OtherSize>& other) {
         bigIntKernels::copy<Size, OtherSize>(ptr(), other.ptr());
     }
@@ -148,6 +152,9 @@ template<int Size> BigIntFixedSize<Size> getConstant(uint64_t a, const BarretRed
 }
 template<int Size> BigIntFixedSize<Size> getConstant(uint64_t a, const MontgomeryReductionMod<BigIntFixedSize<Size>>& m) {
     return getValueInMontgomeryForm(BigIntFixedSize<Size> { a } % m.mod, m);
+}
+template<int Size> BigIntFixedSize<Size> getConstant(const BigIntFixedSize<Size>& a, const MontgomeryReductionMod<BigIntFixedSize<Size>>& m) {
+    return getValueInMontgomeryForm(a % m.mod, m);
 }
 template<int Size> void add(BigIntFixedSize<Size>& r, const BigIntFixedSize<Size>& a, const BigIntFixedSize<Size>& b) {
     bigIntKernels::add<Size>(r.ptr(), a.ptr(), b.ptr());
