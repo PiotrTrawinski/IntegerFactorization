@@ -2,27 +2,33 @@
 #include "../BigInt/include.h"
 
 template<typename T> bool millerRabinTest(const T& n, T d) {
-    T a = n.size() > 1 ? random(2, std::numeric_limits<int>::max()) : random<int>(2, n[0] - 2);
+    T a;
+    if constexpr (std::is_integral_v<T>) {
+        a = random<int>(2, n - 2);
+    } else {
+        a = n.size() > 1 ? random(2, std::numeric_limits<int>::max()) : random<int>(2, n[0] - 2);
+    }
 
     T x;
     modPow(x, a, d, n);
 
+    auto one = T{ 1 };
     auto nm1 = n - T{ 1 };
-    if (x == 1 || x == nm1) {
+    if (x == one || x == nm1) {
         return true;
     }
 
     while (d != nm1) {
         modSqr(x, x, n);
         shl(d, d, 1);
-        if (x == 1)   return false;
+        if (x == one) return false;
         if (x == nm1) return true;
     }
 
     return false;
 }
 
-template<typename T> bool millerRabinTest(T n, int k=24) {
+template<typename T> bool millerRabinTest(const T& n, int k=24) {
     if (n == 2 || n == 3) {
         return true;
     }
@@ -45,4 +51,10 @@ template<typename T> bool millerRabinTest(T n, int k=24) {
     return true;
 }
 
+bool millerRabinTest(uint64_t n, int k=24) {
+    return millerRabinTest(BigIntFixedSize<1>{n}, k);
+}
 
+bool millerRabinTest(const BigInt& n, int k=24) {
+    return n.visitNoInit([k](auto&& a) { return millerRabinTest(a.mod, k); });
+}
